@@ -1,0 +1,340 @@
+
+<h2 class="sr-only">Timeouts, retries, and polling in Playwright API tests — complete guide with real examples for each pattern</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12.5px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.kw{color:var(--color-text-info)}.str{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.tp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:.75rem 0}
+th{text-align:left;padding:7px 10px;font-weight:500;font-size:12px;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)}
+td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:top;line-height:1.5}
+td code{font-family:var(--font-mono);font-size:11.5px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · Timeouts</button>
+  <button class="tab" onclick="go(1)">2 · Test retries</button>
+  <button class="tab" onclick="go(2)">3 · Polling</button>
+  <button class="tab" onclick="go(3)">4 · Retry wrapper</button>
+  <button class="tab" onclick="go(4)">5 · Full patterns</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>Timeouts — three levels, three jobs</h3>
+<p class="sub">Playwright has three separate timeout settings. Each covers a different scope. Knowing which to set where eliminates most "test timed out" confusion.</p>
+
+<table>
+<tr><th>Timeout</th><th>Default</th><th>Controls</th><th>Where to set</th></tr>
+<tr><td><code>timeout</code></td><td>30 000ms</td><td>Entire test — all steps combined</td><td>Config or per-test</td></tr>
+<tr><td><code>actionTimeout</code></td><td>0 (inherit)</td><td>Single request or action</td><td>Config <code>use:{}</code></td></tr>
+<tr><td><code>navigationTimeout</code></td><td>30 000ms</td><td>Page navigation (UI tests)</td><td>Config <code>use:{}</code></td></tr>
+</table>
+
+<div class="lbl">Global timeouts in playwright.config.ts</div>
+<div class="cb">
+<span class="kw">export default</span> defineConfig({<br>
+&nbsp;&nbsp;<span class="cm">// Each test has 30s total to complete all its requests</span><br>
+&nbsp;&nbsp;timeout: <span class="nm">30_000</span>,<br>
+<br>
+&nbsp;&nbsp;use: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Each individual request times out after 10s</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;actionTimeout: <span class="nm">10_000</span>,<br>
+&nbsp;&nbsp;},<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Per-request timeout — override for one slow call</div>
+<div class="cb">
+test(<span class="str">'slow report generation endpoint'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="cm">// This endpoint is known to take up to 45s — set per-request</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> response = <span class="kw">await</span> request.post(<span class="str">'/reports/generate'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data:    { type: <span class="str">'annual'</span>, year: <span class="nm">2024</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout: <span class="nm">45_000</span>, <span class="cm">// ms — this request only</span><br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;expect(response.status()).toBe(<span class="nm">200</span>);<br>
+}, { timeout: <span class="nm">60_000</span> }); <span class="cm">// overall test timeout too</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Per-test timeout — for a whole describe group</div>
+<div class="cb">
+test.describe(<span class="str">'slow integration flows'</span>, () => {<br>
+&nbsp;&nbsp;<span class="cm">// Every test in this group gets 60s</span><br>
+&nbsp;&nbsp;test.describe.configure({ timeout: <span class="nm">60_000</span> });<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'full signup flow'</span>, <span class="kw">async</span> ({ request }) => { <span class="cm">/* ... */</span> });<br>
+&nbsp;&nbsp;test(<span class="str">'data export flow'</span>, <span class="kw">async</span> ({ request }) => { <span class="cm">/* ... */</span> });<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>Don't raise global timeouts to fix flaky tests.</strong> A flaky test hiding behind a 120s timeout is still a flaky test — it just takes twice as long to fail. Timeouts are a diagnostic tool: if a test consistently needs 45s, that request is the problem, not the timeout value. Raise only the timeout for the specific request that needs it.</p></div>
+<button class="askbtn" onclick="sendPrompt('How does Playwright parallel test execution work for API tests, and what are the common pitfalls?')">Parallel execution ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Test retries — Playwright's built-in retry</h3>
+<p class="sub">Playwright can automatically re-run a failed test. This is for genuinely flaky infrastructure — network blips, cold-start latency — not for hiding bugs.</p>
+
+<div class="lbl">Global retry config</div>
+<div class="cb">
+<span class="kw">export default</span> defineConfig({<br>
+&nbsp;&nbsp;<span class="cm">// Retry failed tests up to 2 times in CI, never locally</span><br>
+&nbsp;&nbsp;retries: process.env.CI ? <span class="nm">2</span> : <span class="nm">0</span>,<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>Retries should be 0 locally and 1–2 in CI.</strong> Retrying locally hides bugs — you fix the test by waiting for it to pass on a lucky run. Retrying in CI catches genuine infrastructure flakiness (rate limits, network timeouts, cold starts) without masking code bugs, because you see the retry count in the report.</p></div>
+
+<div class="lbl">Per-test retry — for one known-flaky test</div>
+<div class="cb">
+test(<span class="str">'webhook delivery — eventually consistent'</span>,<br>
+&nbsp;&nbsp;{ retries: <span class="nm">3</span> }, <span class="cm">// this test only</span><br>
+&nbsp;&nbsp;<span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">'/webhooks/latest'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect((<span class="kw">await</span> res.json()).delivered).toBe(<span class="kw">true</span>);<br>
+&nbsp;&nbsp;}<br>
+);<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">test.info().retry — detect which attempt you're on</div>
+<div class="cb">
+test(<span class="str">'with retry-aware setup'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> attempt = test.info().retry; <span class="cm">// 0 = first run, 1 = first retry</span><br>
+<br>
+&nbsp;&nbsp;<span class="kw">if</span> (attempt > <span class="nm">0</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.log(<span class="str">`Retry attempt ${attempt} — clearing cache first`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> request.delete(<span class="str">'/cache/test-data'</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">'/data'</span>);<br>
+&nbsp;&nbsp;expect(res).toBeOK();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>Retries re-run the entire test from the beginning</strong> — including fixtures. If your fixture creates a user via API, it will create another user on retry. Make sure your fixture teardown handles this (the <code>404</code> guard on delete) and that your test data uses unique identifiers like <code>Date.now()</code>.</p></div>
+<button class="askbtn" onclick="sendPrompt('Show me how to write a Playwright fixture that creates a user via API before each test and deletes them after')">Fixtures with teardown ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>Polling — waiting for async operations</h3>
+<p class="sub">Some operations don't complete instantly — jobs, exports, emails, webhooks. Polling repeatedly calls an endpoint until the expected state appears.</p>
+
+<div class="lbl">waitForCondition — reusable polling helper</div>
+<div class="cb">
+<span class="cm">// tests/helpers/poll.ts</span><br>
+<span class="kw">import</span> { APIRequestContext } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<br>
+<span class="kw">interface</span> <span class="tp">PollOptions</span> {<br>
+&nbsp;&nbsp;interval?: <span class="kw">number</span>; <span class="cm">// ms between attempts — default 1000</span><br>
+&nbsp;&nbsp;timeout?:  <span class="kw">number</span>; <span class="cm">// max ms to wait — default 30000</span><br>
+&nbsp;&nbsp;message?:  <span class="kw">string</span>; <span class="cm">// error message on timeout</span><br>
+}<br>
+<br>
+<span class="kw">export async function</span> pollUntil&lt;T&gt;(<br>
+&nbsp;&nbsp;fn: () => Promise&lt;T&gt;,<br>
+&nbsp;&nbsp;condition: (result: T) => <span class="kw">boolean</span>,<br>
+&nbsp;&nbsp;opts: <span class="tp">PollOptions</span> = {}<br>
+): Promise&lt;T&gt; {<br>
+&nbsp;&nbsp;<span class="kw">const</span> { interval = <span class="nm">1000</span>, timeout = <span class="nm">30_000</span>, message = <span class="str">'Polling timed out'</span> } = opts;<br>
+&nbsp;&nbsp;<span class="kw">const</span> deadline = Date.now() + timeout;<br>
+<br>
+&nbsp;&nbsp;<span class="kw">while</span> (Date.now() &lt; deadline) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> result = <span class="kw">await</span> fn();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (condition(result)) <span class="kw">return</span> result;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> <span class="kw">new</span> Promise(r => setTimeout(r, interval));<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<span class="kw">throw new</span> Error(message);<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Using the helper — wait for a background job</div>
+<div class="cb">
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> { pollUntil } <span class="kw">from</span> <span class="str">'./helpers/poll'</span>;<br>
+<br>
+test(<span class="str">'export job completes within 30s'</span>,<br>
+&nbsp;&nbsp;{ timeout: <span class="nm">40_000</span> }, <span class="cm">// test timeout > polling timeout</span><br>
+&nbsp;&nbsp;<span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 1 — kick off the job</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> startRes = <span class="kw">await</span> request.post(<span class="str">'/exports'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { format: <span class="str">'csv'</span>, dateRange: <span class="str">'2024'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(startRes.status()).toBe(<span class="nm">202</span>); <span class="cm">// 202 = accepted, not done yet</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> { jobId } = <span class="kw">await</span> startRes.json();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 2 — poll until status is 'completed'</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> job = <span class="kw">await</span> pollUntil(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> () => (await request.get(<span class="str">`/exports/${jobId}`</span>)).json(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result => result.status === <span class="str">'completed'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interval: <span class="nm">2000</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;timeout:  <span class="nm">30_000</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message:  <span class="str">`Export job ${jobId} did not complete in 30s`</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 3 — assert the completed result</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(job.status).toBe(<span class="str">'completed'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(job.downloadUrl).toMatch(<span class="nm">/\.csv$/</span>);<br>
+&nbsp;&nbsp;}<br>
+);<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>202 Accepted is the correct status for async operations.</strong> It means "I received the request and started working on it — come back later to check." 200 or 201 implies the work is done. If your endpoint returns 200 for a job that isn't finished yet, that's a contract bug worth noting.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I chain API requests in Playwright — create a resource then use its ID in subsequent assertions')">Chaining requests ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>Retry wrapper — retry a single request, not the whole test</h3>
+<p class="sub">Sometimes one flaky request inside a stable test needs retrying. A request-level retry wrapper handles this without touching the rest of the test.</p>
+
+<div class="lbl">retryRequest — retry one call with backoff</div>
+<div class="cb">
+<span class="cm">// tests/helpers/retry.ts</span><br>
+<span class="kw">import</span> { APIResponse, APIRequestContext } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<br>
+<span class="kw">interface</span> <span class="tp">RetryOptions</span> {<br>
+&nbsp;&nbsp;attempts?: <span class="kw">number</span>;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// total attempts — default 3</span><br>
+&nbsp;&nbsp;delay?:    <span class="kw">number</span>;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// ms between attempts — default 1000</span><br>
+&nbsp;&nbsp;retryOn?:  <span class="kw">number</span>[];&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// status codes that trigger a retry</span><br>
+}<br>
+<br>
+<span class="kw">export async function</span> retryRequest(<br>
+&nbsp;&nbsp;fn: () => Promise&lt;<span class="tp">APIResponse</span>&gt;,<br>
+&nbsp;&nbsp;opts: <span class="tp">RetryOptions</span> = {}<br>
+): Promise&lt;<span class="tp">APIResponse</span>&gt; {<br>
+&nbsp;&nbsp;<span class="kw">const</span> { attempts = <span class="nm">3</span>, delay = <span class="nm">1000</span>, retryOn = [<span class="nm">429</span>, <span class="nm">503</span>, <span class="nm">504</span>] } = opts;<br>
+<br>
+&nbsp;&nbsp;<span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; attempts; i++) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> response = <span class="kw">await</span> fn();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Success or non-retryable error — return immediately</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (!retryOn.includes(response.status())) <span class="kw">return</span> response;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Last attempt — return whatever we got</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (i === attempts - <span class="nm">1</span>) <span class="kw">return</span> response;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Exponential backoff: 1s, 2s, 4s...</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> wait = delay * Math.pow(<span class="nm">2</span>, i);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.log(<span class="str">`Retry ${i + 1}/${attempts - 1} after ${wait}ms (status ${response.status()})`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> <span class="kw">new</span> Promise(r => setTimeout(r, wait));<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<span class="kw">throw new</span> Error(<span class="str">'retryRequest: unreachable'</span>);<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Using the retry wrapper</div>
+<div class="cb">
+<span class="kw">import</span> { retryRequest } <span class="kw">from</span> <span class="str">'./helpers/retry'</span>;<br>
+<br>
+test(<span class="str">'GET /data — handles rate limiting gracefully'</span>, <span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Retry on 429 (rate limit) and 503 (service unavailable)</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> response = <span class="kw">await</span> retryRequest(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;() => request.get(<span class="str">'/data'</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ attempts: <span class="nm">4</span>, delay: <span class="nm">500</span>, retryOn: [<span class="nm">429</span>, <span class="nm">503</span>] }<br>
+&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;expect(response.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;expect(<span class="kw">await</span> response.json()).toHaveProperty(<span class="str">'data'</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>Retry on infrastructure errors only — 429, 503, 504.</strong> Never retry on 400, 401, 403, 404, or 422. Those are deterministic errors — retrying them wastes time and hides bugs. The server will return the same error every time. Retry only on errors that are caused by transient conditions: rate limits, service unavailability, and gateway timeouts.</p></div>
+<button class="askbtn" onclick="sendPrompt('What are best practices for negative API testing in Playwright?')">Negative testing ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Full production patterns</h3>
+<p class="sub">All three tools — timeouts, retries, and polling — working together in real test scenarios.</p>
+
+<div class="lbl">Pattern 1 — webhook delivery test</div>
+<div class="cb">
+<span class="cm">// Trigger an action, wait for its async side effect to appear</span><br>
+test(<span class="str">'payment webhook is delivered within 10s'</span>,<br>
+&nbsp;&nbsp;{ timeout: <span class="nm">20_000</span>, tag: [<span class="str">'@regression'</span>, <span class="str">'@slow'</span>] },<br>
+&nbsp;&nbsp;<span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Fire the payment</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> payRes = <span class="kw">await</span> request.post(<span class="str">'/payments'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { amount: <span class="nm">1000</span>, currency: <span class="str">'USD'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> { paymentId } = <span class="kw">await</span> payRes.json();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Poll the webhook log until delivery is confirmed</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> webhook = <span class="kw">await</span> pollUntil(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> () => (await request.get(<span class="str">`/webhooks?paymentId=${paymentId}`</span>)).json(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result => result.delivered === <span class="kw">true</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ interval: <span class="nm">1000</span>, timeout: <span class="nm">10_000</span>, message: <span class="str">'Webhook not delivered in 10s'</span> }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(webhook.delivered).toBe(<span class="kw">true</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(webhook.paymentId).toBe(paymentId);<br>
+&nbsp;&nbsp;}<br>
+);<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Pattern 2 — third-party API with rate limit handling</div>
+<div class="cb">
+test(<span class="str">'syncs data from rate-limited third-party API'</span>,<br>
+&nbsp;&nbsp;{ timeout: <span class="nm">30_000</span> },<br>
+&nbsp;&nbsp;<span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Retry the external call — it rate-limits at 10 req/s</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> syncRes = <span class="kw">await</span> retryRequest(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;() => request.post(<span class="str">'/sync/external'</span>, { timeout: <span class="nm">10_000</span> }),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ attempts: <span class="nm">3</span>, delay: <span class="nm">2000</span>, retryOn: [<span class="nm">429</span>] }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(syncRes.status()).toBe(<span class="nm">202</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> { syncId } = <span class="kw">await</span> syncRes.json();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Then poll until sync completes</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> result = <span class="kw">await</span> pollUntil(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> () => (await request.get(<span class="str">`/sync/${syncId}`</span>)).json(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r => [<span class="str">'completed'</span>, <span class="str">'failed'</span>].includes(r.status),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ interval: <span class="nm">3000</span>, timeout: <span class="nm">20_000</span> }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(result.status).toBe(<span class="str">'completed'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(result.recordsSynced).toBeGreaterThan(<span class="nm">0</span>);<br>
+&nbsp;&nbsp;}<br>
+);<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p>In the poll condition above, checking for <code>'completed'</code> OR <code>'failed'</code> is important. If you only poll until <code>'completed'</code> and the job fails, the polling runs for the full timeout period before throwing — adding 20s of wasted time to every failed test run. Exit polling on any terminal state, then assert which state you got.</p></div>
+<button class="askbtn" onclick="sendPrompt('How does Playwright parallel test execution work for API tests, and what are the common pitfalls?')">Parallel execution ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>

@@ -1,0 +1,338 @@
+
+<h2 class="sr-only">Complete GitHub Actions workflow for Playwright API tests — secrets setup, matrix environments, HTML report upload, and PR annotations</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.ky{color:var(--color-text-info)}.sv{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.sp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.step-row{display:flex;gap:12px;margin:.5rem 0;padding:.75rem 1rem;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);align-items:flex-start;background:var(--color-background-primary)}
+.step-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;margin-top:1px}
+.sn-info{background:var(--color-background-info);color:var(--color-text-info)}
+.step-body h4{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.step-body p{font-size:12.5px;color:var(--color-text-secondary);line-height:1.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem}
+.card h4{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500;font-family:var(--font-sans);margin-bottom:6px}
+.b-info{background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)}
+.b-warn{background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning)}
+.b-success{background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · Project setup</button>
+  <button class="tab" onclick="go(1)">2 · Basic workflow</button>
+  <button class="tab" onclick="go(2)">3 · Secrets</button>
+  <button class="tab" onclick="go(3)">4 · HTML report</button>
+  <button class="tab" onclick="go(4)">5 · Full production</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>What you need before writing the workflow</h3>
+<p class="sub">Three things must be in place before the workflow file makes sense.</p>
+
+<div class="step-row">
+  <div class="step-num sn-info">1</div>
+  <div class="step-body"><h4>npm test script in package.json</h4><p>The workflow calls <code>npm test</code>. Make sure it maps to Playwright.</p></div>
+</div>
+<div class="cb">
+<span class="cm"># package.json</span><br>
+{<br>
+&nbsp;&nbsp;<span class="sv">"scripts"</span>: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">"test"</span>: <span class="sv">"playwright test"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">"test:smoke"</span>: <span class="sv">"playwright test --grep @smoke"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">"test:ci"</span>: <span class="sv">"playwright test --reporter=html,list"</span><br>
+&nbsp;&nbsp;}<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="step-row">
+  <div class="step-num sn-info">2</div>
+  <div class="step-body"><h4>playwright.config.ts is CI-aware</h4><p>Retries, workers, and reporter differ between local and CI.</p></div>
+</div>
+<div class="cb">
+<span class="cm"># playwright.config.ts</span><br>
+<span class="ky">export default</span> defineConfig({<br>
+&nbsp;&nbsp;fullyParallel: <span class="ky">true</span>,<br>
+&nbsp;&nbsp;retries: process.env.CI ? <span class="nm">2</span> : <span class="nm">0</span>,<br>
+&nbsp;&nbsp;workers: process.env.CI ? <span class="nm">4</span> : <span class="ky">undefined</span>,<br>
+&nbsp;&nbsp;reporter: process.env.CI<br>
+&nbsp;&nbsp;&nbsp;&nbsp;? [[<span class="sv">'html'</span>, { open: <span class="sv">'never'</span> }], [<span class="sv">'github'</span>]]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;: <span class="sv">'list'</span>,<br>
+&nbsp;&nbsp;use: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;baseURL: process.env.BASE_URL,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;extraHTTPHeaders: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">'Authorization'</span>: <span class="sv">`Bearer ${process.env.API_TOKEN}`</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;},<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="step-row">
+  <div class="step-num sn-info">3</div>
+  <div class="step-body"><h4>Workflow file location</h4><p>Create <code>.github/workflows/api-tests.yml</code> at the repo root.</p></div>
+</div>
+<div class="info"><p><strong>The <code>github</code> reporter</strong> annotates failing tests directly on PR lines in the GitHub UI — no need to open the HTML report to see which test failed. Add it alongside <code>html</code> in CI so you get both the annotation and the downloadable report.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I organise Playwright API tests with describe blocks, tags, and multiple environments?')">Environment setup ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Basic workflow — runs on every PR</h3>
+<p class="sub">The minimal working workflow. Gets smoke tests running on every pull request in under 2 minutes.</p>
+
+<div class="lbl">.github/workflows/api-tests.yml</div>
+<div class="cb">
+<span class="ky">name</span>: <span class="sv">API tests</span><br>
+<br>
+<span class="ky">on</span>:<br>
+&nbsp;&nbsp;<span class="ky">push</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">branches</span>: [<span class="sv">main</span>, <span class="sv">develop</span>]<br>
+&nbsp;&nbsp;<span class="ky">pull_request</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">branches</span>: [<span class="sv">main</span>]<br>
+<br>
+<span class="ky">jobs</span>:<br>
+&nbsp;&nbsp;<span class="ky">test</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">Run API tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">runs-on</span>: <span class="sv">ubuntu-latest</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">steps</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Checkout code</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">uses</span>: <span class="sv">actions/checkout@v4</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Set up Node.js</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">uses</span>: <span class="sv">actions/setup-node@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">node-version</span>: <span class="sv">'20'</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">cache</span>: <span class="sv">'npm'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Install dependencies</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: <span class="sv">npm ci</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Run smoke tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: <span class="sv">npx playwright test --grep @smoke</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">BASE_URL</span>: <span class="sv">${{ secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">API_TOKEN</span>: <span class="sv">${{ secrets.STAGING_API_TOKEN }}</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong><code>npm ci</code> not <code>npm install</code>.</strong> In CI always use <code>npm ci</code> — it installs exact versions from <code>package-lock.json</code>, never resolves new versions, and errors if the lockfile is out of sync. This makes builds reproducible and prevents "works on my machine" surprises.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I organise Playwright API tests with tags like @smoke and @regression?')">Tagging tests ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>Secrets — the right way</h3>
+<p class="sub">Never hardcode tokens. All credentials live in GitHub Secrets and arrive in the workflow as environment variables.</p>
+
+<div class="lbl">Where to add secrets in GitHub</div>
+<div class="step-row">
+  <div class="step-num sn-info">1</div>
+  <div class="step-body"><h4>Repository secrets</h4><p>Go to your repo → Settings → Secrets and variables → Actions → New repository secret</p></div>
+</div>
+<div class="step-row">
+  <div class="step-num sn-info">2</div>
+  <div class="step-body"><h4>Environment secrets</h4><p>For per-environment credentials: Settings → Environments → New environment → Add secret. Use <code>staging</code> and <code>production</code> environments.</p></div>
+</div>
+<div class="step-row">
+  <div class="step-num sn-info">3</div>
+  <div class="step-body"><h4>Reference in workflow</h4><p>Use <code>${{ secrets.SECRET_NAME }}</code> — GitHub masks this value in all logs automatically.</p></div>
+</div>
+
+<div class="lbl">Secrets to create for API testing</div>
+<div class="cb">
+<span class="cm"># Repository secrets — available to all workflows</span><br>
+STAGING_BASE_URL      = https://staging-api.yourapp.com<br>
+STAGING_API_TOKEN     = your-staging-token<br>
+STAGING_TEST_EMAIL    = test@yourapp.com<br>
+STAGING_TEST_PASSWORD = testpassword123<br>
+<br>
+<span class="cm"># Production environment secrets — locked to prod env</span><br>
+PROD_BASE_URL         = https://api.yourapp.com<br>
+PROD_API_TOKEN        = your-prod-token<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Using secrets in the workflow</div>
+<div class="cb">
+<span class="ky">steps</span>:<br>
+&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Run tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: <span class="sv">npx playwright test</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">BASE_URL</span>:      <span class="sv">${{ secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">API_TOKEN</span>:    <span class="sv">${{ secrets.STAGING_API_TOKEN }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">TEST_EMAIL</span>:   <span class="sv">${{ secrets.STAGING_TEST_EMAIL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">TEST_PASSWORD</span>: <span class="sv">${{ secrets.STAGING_TEST_PASSWORD }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">CI</span>: <span class="sv">true</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>Never print secrets to logs.</strong> GitHub masks <code>${{ secrets.X }}</code> values in workflow logs, but if you echo the value to a file or pass it through a custom command that logs its arguments, it may appear in plaintext. Treat secrets as write-only in workflow files.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I handle authentication in Playwright API tests — Bearer token, API key, and Basic auth examples')">Auth in tests ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>HTML report — upload and access after a run</h3>
+<p class="sub">The HTML report is the most useful debugging artifact. Upload it so anyone can download and open it — even after tests fail.</p>
+
+<div class="lbl">Upload report as a workflow artifact</div>
+<div class="cb">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Run tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: <span class="sv">npx playwright test</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">BASE_URL</span>: <span class="sv">${{ secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">API_TOKEN</span>: <span class="sv">${{ secrets.STAGING_API_TOKEN }}</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># if: always() — upload even when tests fail</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># Without this, a failed test cancels all subsequent steps</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Upload HTML report</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">uses</span>: <span class="sv">actions/upload-artifact@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">if</span>: <span class="sv">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">playwright-report-${{ github.run_id }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">path</span>: <span class="sv">playwright-report/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">retention-days</span>: <span class="nm">30</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p><strong><code>if: always()</code> is mandatory on the upload step.</strong> Without it, GitHub skips all steps after the first failure. Your tests fail, the upload step is skipped, and there's no report to debug with. <code>if: always()</code> makes the upload unconditional — it runs whether tests passed, failed, or were cancelled.</p></div>
+
+<div class="lbl">How to access the report after a run</div>
+<div class="step-row">
+  <div class="step-num sn-info">1</div>
+  <div class="step-body"><h4>Open the workflow run on GitHub</h4><p>Go to Actions → your workflow run</p></div>
+</div>
+<div class="step-row">
+  <div class="step-num sn-info">2</div>
+  <div class="step-body"><h4>Scroll to Artifacts section</h4><p>Download <code>playwright-report-{run_id}.zip</code></p></div>
+</div>
+<div class="step-row">
+  <div class="step-num sn-info">3</div>
+  <div class="step-body"><h4>Unzip and open locally</h4><p>Run <code>npx playwright show-report path/to/report</code></p></div>
+</div>
+<button class="askbtn" onclick="sendPrompt('How do I set up Allure reporting with Playwright and attach API request details to each test result?')">Allure reporting ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Full production workflow</h3>
+<p class="sub">Complete workflow with two jobs — smoke tests on every PR, full regression nightly — plus HTML report upload, caching, and environment matrix.</p>
+
+<div class="lbl">.github/workflows/api-tests.yml — complete</div>
+<div class="cb">
+<span class="ky">name</span>: <span class="sv">API tests</span><br>
+<br>
+<span class="ky">on</span>:<br>
+&nbsp;&nbsp;<span class="ky">pull_request</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">branches</span>: [<span class="sv">main</span>, <span class="sv">develop</span>]<br>
+&nbsp;&nbsp;<span class="ky">push</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">branches</span>: [<span class="sv">main</span>]<br>
+&nbsp;&nbsp;<span class="ky">schedule</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">cron</span>: <span class="sv">'0 2 * * *'</span> <span class="cm">  # nightly at 02:00 UTC</span><br>
+&nbsp;&nbsp;<span class="ky">workflow_dispatch</span>: <span class="cm">  # manual trigger from UI</span><br>
+<br>
+<span class="ky">jobs</span>:<br>
+<br>
+&nbsp;&nbsp;<span class="cm">  # ── Job 1: smoke on every PR ─────────────────────</span><br>
+&nbsp;&nbsp;<span class="ky">smoke</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">Smoke tests (staging)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">runs-on</span>: <span class="sv">ubuntu-latest</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">if</span>: <span class="sv">github.event_name == 'pull_request'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">steps</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">uses</span>: <span class="sv">actions/checkout@v4</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">uses</span>: <span class="sv">actions/setup-node@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">node-version</span>: <span class="sv">'20'</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">cache</span>: <span class="sv">'npm'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">run</span>: <span class="sv">npm ci</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Smoke tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: <span class="sv">npx playwright test --grep @smoke</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">CI</span>: <span class="sv">true</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">BASE_URL</span>: <span class="sv">${{ secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">API_TOKEN</span>: <span class="sv">${{ secrets.STAGING_API_TOKEN }}</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Upload report</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">uses</span>: <span class="sv">actions/upload-artifact@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">if</span>: <span class="sv">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">smoke-report-${{ github.run_id }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">path</span>: <span class="sv">playwright-report/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">retention-days</span>: <span class="nm">7</span><br>
+<br>
+&nbsp;&nbsp;<span class="cm">  # ── Job 2: full regression nightly ───────────────</span><br>
+&nbsp;&nbsp;<span class="ky">regression</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">Full regression (${{ matrix.env }})</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">runs-on</span>: <span class="sv">ubuntu-latest</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">if</span>: <span class="sv">github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">strategy</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">fail-fast</span>: <span class="sv">false</span> <span class="cm">  # run all envs even if one fails</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">matrix</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>: [<span class="sv">staging</span>, <span class="sv">production</span>]<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">steps</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">uses</span>: <span class="sv">actions/checkout@v4</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">uses</span>: <span class="sv">actions/setup-node@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">node-version</span>: <span class="sv">'20'</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">cache</span>: <span class="sv">'npm'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">run</span>: <span class="sv">npm ci</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Regression — ${{ matrix.env }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">  # Production only runs smoke — never full write tests on prod</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">run</span>: |<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">if [ "${{ matrix.env }}" = "production" ]; then</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">npx playwright test --grep @smoke</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">else</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">npx playwright test --grep @regression</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sv">fi</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">CI</span>: <span class="sv">true</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">BASE_URL</span>: <span class="sv">${{ matrix.env == 'production' && secrets.PROD_BASE_URL || secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">API_TOKEN</span>: <span class="sv">${{ matrix.env == 'production' && secrets.PROD_API_TOKEN || secrets.STAGING_API_TOKEN }}</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="ky">name</span>: <span class="sv">Upload report — ${{ matrix.env }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">uses</span>: <span class="sv">actions/upload-artifact@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">if</span>: <span class="sv">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">name</span>: <span class="sv">regression-${{ matrix.env }}-${{ github.run_id }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">path</span>: <span class="sv">playwright-report/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ky">retention-days</span>: <span class="nm">30</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p><code>fail-fast: false</code> on the matrix is critical. Without it, if staging tests fail, GitHub immediately cancels the production job too — so you never find out whether production is healthy. Always set <code>fail-fast: false</code> on environment matrices so every environment runs to completion independently.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I set up Allure reporting with Playwright and attach API request details?')">Allure reporting ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>
