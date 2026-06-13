@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "url": "https://petstore.swagger.io/v2/user",
+  "payload": {
+    "username": "Alice-1781375495769",
+    "firstName": "Alice",
+    "lastName": "Smith",
+    "email": "Alice-1781375495769@test.com",
+    "password": "Password123",
+    "phone": "9999999999",
+    "userStatus": 1
+  }
+}
