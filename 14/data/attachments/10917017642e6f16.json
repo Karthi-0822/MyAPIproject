@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "headers": {
+    "date": "Sat, 13 Jun 2026 18:35:36 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, DELETE, PUT",
+    "access-control-allow-headers": "Content-Type, api_key, Authorization",
+    "server": "Jetty(9.2.9.v20150224)"
+  },
+  "body": {
+    "code": 200,
+    "type": "unknown",
+    "message": "Alice-1781375735849"
+  }
+}

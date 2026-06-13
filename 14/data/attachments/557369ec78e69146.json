@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "headers": {
+    "date": "Sat, 13 Jun 2026 18:35:35 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, DELETE, PUT",
+    "access-control-allow-headers": "Content-Type, api_key, Authorization",
+    "server": "Jetty(9.2.9.v20150224)"
+  },
+  "body": {
+    "id": 9223372036854776000,
+    "username": "John-1781375733701",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "John-1781375733701@test.com",
+    "password": "Password123",
+    "phone": "9999999999",
+    "userStatus": 1
+  }
+}
