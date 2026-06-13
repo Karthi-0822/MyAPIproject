@@ -1,0 +1,372 @@
+
+<h2 class="sr-only">Mocking API responses with page.route() in Playwright — complete guide covering intercept, fulfill, modify, and real-world patterns</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12.5px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.kw{color:var(--color-text-info)}.str{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.tp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.flow{display:flex;align-items:center;gap:4px;margin:.75rem 0;flex-wrap:wrap}
+.fs{padding:5px 12px;border-radius:var(--border-radius-md);font-size:12px;font-weight:500;white-space:nowrap;border:0.5px solid}
+.fa{color:var(--color-text-tertiary);font-size:14px;flex-shrink:0}
+.f-browser{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.f-pw{background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success)}
+.f-api{background:var(--color-background-warning);color:var(--color-text-warning);border-color:var(--color-border-warning)}
+.f-mock{background:#EEEDFE;color:#534AB7;border-color:#AFA9EC}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:.75rem 0}
+th{text-align:left;padding:7px 10px;font-weight:500;font-size:12px;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)}
+td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:top;line-height:1.5}
+td code{font-family:var(--font-mono);font-size:11.5px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · How it works</button>
+  <button class="tab" onclick="go(1)">2 · Basic mock</button>
+  <button class="tab" onclick="go(2)">3 · Error scenarios</button>
+  <button class="tab" onclick="go(3)">4 · Modify real response</button>
+  <button class="tab" onclick="go(4)">5 · Real-world patterns</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>How page.route() intercepts requests</h3>
+<p class="sub"><code>page.route()</code> sits between the browser and the network. It intercepts matching requests before they leave the browser and lets you decide what happens next.</p>
+
+<div class="lbl">Without mocking — real network call</div>
+<div class="flow">
+  <span class="fs f-browser">browser</span>
+  <span class="fa">→</span>
+  <span class="fs f-api">network request</span>
+  <span class="fa">→</span>
+  <span class="fs f-api">real API server</span>
+  <span class="fa">→</span>
+  <span class="fs f-api">real response</span>
+  <span class="fa">→</span>
+  <span class="fs f-browser">browser</span>
+</div>
+
+<div class="lbl">With page.route() — intercepted</div>
+<div class="flow">
+  <span class="fs f-browser">browser</span>
+  <span class="fa">→</span>
+  <span class="fs f-pw">page.route()</span>
+  <span class="fa">→</span>
+  <span class="fs f-mock">route.fulfill()</span>
+  <span class="fa">→</span>
+  <span class="fs f-browser">browser (gets mock)</span>
+</div>
+<div style="height:6px"></div>
+<div class="flow">
+  <span class="fs f-browser">browser</span>
+  <span class="fa">→</span>
+  <span class="fs f-pw">page.route()</span>
+  <span class="fa">→</span>
+  <span class="fs f-api">route.continue()</span>
+  <span class="fa">→</span>
+  <span class="fs f-api">real API</span>
+  <span class="fa">→</span>
+  <span class="fs f-browser">browser</span>
+</div>
+
+<div class="info"><p><code>page.route()</code> is a <strong>UI test tool</strong> — it intercepts requests made by the browser page, not by Playwright's own <code>request</code> fixture. Use it in tests that open a browser page and you want to control what the page's fetch/XHR calls receive, without hitting a real backend.</p></div>
+
+<div class="lbl">Three things you can do with an intercepted request</div>
+<table>
+<tr><th>Action</th><th>Method</th><th>When to use</th></tr>
+<tr><td>Return a fake response</td><td><code>route.fulfill()</code></td><td>Simulate any response — success, error, slow — without a real server</td></tr>
+<tr><td>Let it through unchanged</td><td><code>route.continue()</code></td><td>Pass-through — selectively mock only some requests</td></tr>
+<tr><td>Modify then pass through</td><td><code>route.fetch()</code> + <code>route.fulfill()</code></td><td>Real response but tweak one field or header</td></tr>
+</table>
+
+<div class="warn"><p><strong>page.route() only works with a browser page.</strong> It cannot intercept requests made via Playwright's <code>request</code> fixture or via Node.js code running outside the browser. If you want to mock in pure API tests without a browser, use a library like <code>msw</code> (Mock Service Worker) instead.</p></div>
+<button class="askbtn" onclick="sendPrompt('What is the difference between page.route() mocking and using a real test API in Playwright?')">Mocking vs real API ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Basic mock — fulfill with fake data</h3>
+<p class="sub">Intercept a URL pattern and return exactly what you want. No real server needed.</p>
+
+<div class="lbl">Simple JSON mock</div>
+<div class="cb">
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<br>
+test(<span class="str">'shows user profile from mocked API'</span>, <span class="kw">async</span> ({ page }) => {<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Intercept before navigating — route is active immediately</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/users/1'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;status:      <span class="nm">200</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;contentType: <span class="str">'application/json'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body: JSON.stringify({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id:    <span class="nm">1</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:  <span class="str">'Alice'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;email: <span class="str">'alice@example.com'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;role:  <span class="str">'admin'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Navigate — the page's fetch call hits our mock, not the real server</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/profile'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Assert the UI rendered the mocked data</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByText(<span class="str">'Alice'</span>)).toBeVisible();<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByText(<span class="str">'alice@example.com'</span>)).toBeVisible();<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'role-badge'</span>)).toHaveText(<span class="str">'admin'</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">URL pattern matching — the glob rules</div>
+<div class="cb">
+<span class="cm">// ** matches any number of path segments</span><br>
+page.route(<span class="str">'**/api/users'</span>, handler);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// any host, path ends in /api/users</span><br>
+page.route(<span class="str">'**/api/users/*'</span>, handler);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// any user id</span><br>
+page.route(<span class="str">'https://api.example.com/**'</span>, handler); <span class="cm">// entire domain</span><br>
+<br>
+<span class="cm">// Regex for precise matching</span><br>
+page.route(<span class="nm">/\/api\/users\/\d+/</span>, handler);&nbsp;&nbsp;&nbsp;<span class="cm">// /api/users/123 but not /api/users/abc</span><br>
+<br>
+<span class="cm">// Selective — only mock one endpoint, pass everything else through</span><br>
+page.route(<span class="str">'**'</span>, route => {<br>
+&nbsp;&nbsp;<span class="kw">if</span> (route.request().url().includes(<span class="str">'/api/users'</span>)) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;route.fulfill({ status: <span class="nm">200</span>, body: JSON.stringify([]) });<br>
+&nbsp;&nbsp;} <span class="kw">else</span> {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;route.continue();&nbsp;&nbsp;<span class="cm">// everything else hits the real server</span><br>
+&nbsp;&nbsp;}<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>Set up routes before <code>page.goto()</code>.</strong> The route handler must be registered before the page navigates — otherwise the page's initial fetch calls fire before Playwright can intercept them. Always <code>await page.route()</code> first, then <code>await page.goto()</code>.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I test that my frontend handles API errors correctly in Playwright?')">Testing UI error handling ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>Error scenarios — simulate failures</h3>
+<p class="sub">The most valuable use of mocking — testing how your UI handles 404s, 500s, network failures, and slow responses. Impossible to test reliably without mocking.</p>
+
+<div class="lbl">404 — resource not found</div>
+<div class="cb">
+test(<span class="str">'shows "not found" message when user does not exist'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/users/999'</span>, route => route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;status:      <span class="nm">404</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;contentType: <span class="str">'application/json'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body: JSON.stringify({ error: <span class="str">'User not found'</span> }),<br>
+&nbsp;&nbsp;}));<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/users/999'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'error-message'</span>)).toHaveText(<span class="str">'User not found'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'profile-card'</span>)).not.toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">500 — server error</div>
+<div class="cb">
+test(<span class="str">'shows error banner when server fails'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/posts'</span>, route => route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;status:      <span class="nm">500</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;contentType: <span class="str">'application/json'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body: JSON.stringify({ error: <span class="str">'Internal server error'</span> }),<br>
+&nbsp;&nbsp;}));<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/posts'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByRole(<span class="str">'alert'</span>)).toBeVisible();<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'post-list'</span>)).not.toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Network failure — connection refused</div>
+<div class="cb">
+test(<span class="str">'shows offline message on network failure'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="cm">// abort() simulates the request failing at the network level</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/**'</span>, route => route.abort(<span class="str">'failed'</span>));<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/dashboard'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByText(<span class="str">'Unable to connect'</span>)).toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Slow response — loading states</div>
+<div class="cb">
+test(<span class="str">'shows loading spinner during slow request'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/posts'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Delay the response by 2 seconds</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> <span class="kw">new</span> Promise(resolve => setTimeout(resolve, <span class="nm">2000</span>));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;status: <span class="nm">200</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body:   JSON.stringify([]),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/posts'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Spinner must appear immediately</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'loading-spinner'</span>)).toBeVisible();<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// After response arrives, spinner must disappear</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'loading-spinner'</span>)).not.toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p>These four error scenarios — 404, 500, network abort, and slow response — are the ones most commonly missing from UI test suites, and the ones most commonly broken in production. Mocking makes all four trivial to test consistently.</p></div>
+<button class="askbtn" onclick="sendPrompt('What are the best practices for negative API testing in Playwright? Give me 5 real examples.')">Negative API testing ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>Modify a real response</h3>
+<p class="sub">Fetch the real API response, tweak one field, and return the modified version. Tests against real data with controlled edge cases.</p>
+
+<div class="lbl">route.fetch() + modify + fulfill</div>
+<div class="cb">
+test(<span class="str">'shows admin banner when role is admin'</span>, <span class="kw">async</span> ({ page }) => {<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/users/me'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 1 — make the real request</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> realResponse = <span class="kw">await</span> route.fetch();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 2 — parse the real body</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> body = <span class="kw">await</span> realResponse.json();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 3 — change just what we need</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;body.role = <span class="str">'admin'</span>;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 4 — return the modified response</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response:    realResponse,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// inherit real status + headers</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body:        JSON.stringify(body), <span class="cm">// override just the body</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;contentType: <span class="str">'application/json'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/dashboard'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'admin-banner'</span>)).toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>Passing <code>response: realResponse</code> to <code>fulfill()</code></strong> inherits the real response's status code, headers, and cookies — you only override what you explicitly set. This means your mock stays realistic without having to replicate every header manually.</p></div>
+
+<div class="lbl">Inject extra items into a list response</div>
+<div class="cb">
+test(<span class="str">'handles large list correctly'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/posts'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> real = <span class="kw">await</span> route.fetch();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> posts = <span class="kw">await</span> real.json();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Inject 50 extra items to test pagination/virtual scroll</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> extras = Array.from({ length: <span class="nm">50</span> }, (_, i) => ({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id: <span class="nm">9000</span> + i, title: <span class="str">`Injected post ${i}`</span>, userId: <span class="nm">1</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}));<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response: real,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body: JSON.stringify([...posts, ...extras]),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/posts'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'pagination'</span>)).toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+<button class="askbtn" onclick="sendPrompt('How do I mock API responses in Playwright without a browser using MSW?')">Mocking without a browser ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Real-world patterns</h3>
+<p class="sub">Patterns that appear in production test suites — counting calls, unrouting, and loading mocks from fixture files.</p>
+
+<div class="lbl">Count how many times an endpoint was called</div>
+<div class="cb">
+test(<span class="str">'search debounces — fires only one request per typed word'</span>,<br>
+&nbsp;&nbsp;<span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">let</span> callCount = <span class="nm">0</span>;<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/search**'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;callCount++;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;status: <span class="nm">200</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body:   JSON.stringify({ results: [] }),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/search'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> page.getByPlaceholder(<span class="str">'Search...'</span>).fill(<span class="str">'playwright'</span>);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Wait for debounce to settle</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> page.waitForTimeout(<span class="nm">500</span>);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Typing 10 chars should fire only 1 debounced request</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(callCount).toBe(<span class="nm">1</span>);<br>
+&nbsp;&nbsp;}<br>
+);<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Load mock data from a JSON fixture file</div>
+<div class="cb">
+<span class="cm">// tests/fixtures/users.json</span><br>
+<span class="cm">// [{ "id": 1, "name": "Alice", "role": "admin" }, ...]</span><br>
+<br>
+test(<span class="str">'renders all users from fixture file'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/users'</span>, <span class="kw">async</span> route => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;status:  <span class="nm">200</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;path:    <span class="str">'tests/fixtures/users.json'</span>, <span class="cm">// serve file directly</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/users'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'user-row'</span>)).toHaveCount(<span class="nm">3</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Unroute — remove a mock mid-test</div>
+<div class="cb">
+test(<span class="str">'mock only the first call, then use real API'</span>, <span class="kw">async</span> ({ page }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> handler = <span class="kw">async</span> (route: Route) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> route.fulfill({ status: <span class="nm">200</span>, body: JSON.stringify({ cached: <span class="kw">true</span> }) });<br>
+&nbsp;&nbsp;};<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.route(<span class="str">'**/api/data'</span>, handler);<br>
+&nbsp;&nbsp;<span class="kw">await</span> page.goto(<span class="str">'/dashboard'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Remove the mock — subsequent calls hit the real server</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> page.unroute(<span class="str">'**/api/data'</span>, handler);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Trigger a refresh — this now hits the real API</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> page.getByRole(<span class="str">'button'</span>, { name: <span class="str">'Refresh'</span> }).click();<br>
+&nbsp;&nbsp;<span class="kw">await</span> expect(page.getByTestId(<span class="str">'data-panel'</span>)).toBeVisible();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p>The <code>path:</code> option in <code>route.fulfill()</code> is one of the most underused features. It serves a file directly from disk as the response body — no <code>fs.readFileSync()</code>, no JSON.parse/stringify, no manual content-type guessing. Playwright infers the content-type from the file extension automatically.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I handle timeouts and retries in Playwright API tests?')">Timeouts and retries ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>

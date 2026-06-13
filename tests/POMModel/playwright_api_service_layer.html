@@ -1,0 +1,399 @@
+
+<h2 class="sr-only">Page Object Model service layer for Playwright API tests — complete guide from base client to domain services, fixtures, and full test file</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.kw{color:var(--color-text-info)}.str{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.tp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.ftree{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;font-family:var(--font-mono);font-size:12px;line-height:2.1}
+.fd{color:var(--color-text-info);font-weight:500}
+.ff{color:var(--color-text-primary)}
+.fn{color:var(--color-text-tertiary);font-style:italic;font-family:var(--font-sans);font-size:11.5px;margin-left:6px}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · The concept</button>
+  <button class="tab" onclick="go(1)">2 · Base client</button>
+  <button class="tab" onclick="go(2)">3 · UserService</button>
+  <button class="tab" onclick="go(3)">4 · PostService</button>
+  <button class="tab" onclick="go(4)">5 · Fixtures</button>
+  <button class="tab" onclick="go(5)">6 · Tests</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>Why a service layer — and what it looks like</h3>
+<p class="sub">Without a service layer, HTTP details bleed into every test. With one, tests read like business scenarios.</p>
+
+<div class="lbl">Without service layer — HTTP details everywhere</div>
+<div class="cb">
+test(<span class="str">'user can update their profile'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="cm">// Login — repeated in every test file</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> loginRes = <span class="kw">await</span> request.post(<span class="str">'/auth/login'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { email: process.env.TEST_EMAIL, password: process.env.TEST_PASSWORD },<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;<span class="kw">const</span> { token } = <span class="kw">await</span> loginRes.json();<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Create user — raw HTTP, no abstraction</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> createRes = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Alice'</span>, email: <span class="str">`a-${Date.now()}@t.com`</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;headers: { <span class="str">'Authorization'</span>: <span class="str">`Bearer ${token}`</span> },<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> createRes.json();<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Update — same HTTP noise</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> patchRes = <span class="kw">await</span> request.patch(<span class="str">`/users/${user.id}`</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Alice Updated'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;headers: { <span class="str">'Authorization'</span>: <span class="str">`Bearer ${token}`</span> },<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;expect(patchRes.status()).toBe(<span class="nm">200</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">With service layer — reads like a business scenario</div>
+<div class="cb">
+test(<span class="str">'user can update their profile'</span>, <span class="kw">async</span> ({ users }) => {<br>
+&nbsp;&nbsp;<span class="cm">// No HTTP. No tokens. No headers. Just intent.</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> users.create({ name: <span class="str">'Alice'</span> });<br>
+&nbsp;&nbsp;<span class="kw">const</span> updated = <span class="kw">await</span> users.update(user.id, { name: <span class="str">'Alice Updated'</span> });<br>
+&nbsp;&nbsp;expect(updated.name).toBe(<span class="str">'Alice Updated'</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Project structure</div>
+<div class="ftree">
+<span class="fd">services/</span><br>
+&nbsp;&nbsp;<span class="ff">base.client.ts</span><span class="fn">← APIRequestContext wrapper — auth, errors, baseURL</span><br>
+&nbsp;&nbsp;<span class="ff">user.service.ts</span><span class="fn">← all user operations</span><br>
+&nbsp;&nbsp;<span class="ff">post.service.ts</span><span class="fn">← all post operations</span><br>
+&nbsp;&nbsp;<span class="ff">auth.service.ts</span><span class="fn">← login, logout, token management</span><br>
+<span class="fd">fixtures/</span><br>
+&nbsp;&nbsp;<span class="ff">index.ts</span><span class="fn">← injects services into tests</span><br>
+<span class="fd">tests/</span><br>
+&nbsp;&nbsp;<span class="ff">users.spec.ts</span><span class="fn">← uses services, reads like docs</span><br>
+&nbsp;&nbsp;<span class="ff">posts.spec.ts</span>
+</div>
+<button class="askbtn" onclick="sendPrompt('Explain Playwright APIRequestContext — what is it and when do I create my own?')">APIRequestContext explained ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Base client — auth, error handling, shared config</h3>
+<p class="sub">Every service extends this. Auth headers, error guards, and JSON parsing live here once. Services never repeat them.</p>
+
+<div class="lbl">services/base.client.ts</div>
+<div class="cb">
+<span class="kw">import</span> { APIRequestContext, APIResponse } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<br>
+<span class="kw">export class</span> <span class="tp">BaseClient</span> {<br>
+&nbsp;&nbsp;<span class="kw">protected readonly</span> request: APIRequestContext;<br>
+&nbsp;&nbsp;<span class="kw">protected readonly</span> baseURL: <span class="kw">string</span>;<br>
+<br>
+&nbsp;&nbsp;<span class="kw">constructor</span>(request: APIRequestContext, baseURL: <span class="kw">string</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">this</span>.request = request;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">this</span>.baseURL = baseURL;<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Central error guard — call on every response</span><br>
+&nbsp;&nbsp;<span class="kw">protected async</span> assertOk(res: APIResponse, context: <span class="kw">string</span>): Promise&lt;<span class="kw">void</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (!res.ok()) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> body = <span class="kw">await</span> res.text();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">throw new</span> Error(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">`${context} failed — ${res.status()} ${res.url()}\n${body}`</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Parse JSON or return text — never throw on body read</span><br>
+&nbsp;&nbsp;<span class="kw">protected async</span> json&lt;T&gt;(res: APIResponse): Promise&lt;T&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">try</span> { <span class="kw">return await</span> res.json() <span class="kw">as</span> T; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">catch</span> { <span class="kw">throw new</span> Error(<span class="str">`Non-JSON response from ${res.url()}: ${await res.text()}`</span>); }<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Convenience: assert + parse in one call</span><br>
+&nbsp;&nbsp;<span class="kw">protected async</span> assertAndParse&lt;T&gt;(res: APIResponse, ctx: <span class="kw">string</span>): Promise&lt;T&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await this</span>.assertOk(res, ctx);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.json&lt;T&gt;(res);<br>
+&nbsp;&nbsp;}<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>The <code>assertAndParse</code> helper is the key.</strong> In raw tests you must remember to check the status before calling <code>.json()</code> every single time. In services, one method does both — the error message includes the HTTP status, URL, and body, so failures are self-describing without needing to open the Allure report.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I handle Bearer token auth in Playwright API tests across multiple test files using fixtures?')">Auth fixtures ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>UserService — domain operations, no HTTP noise</h3>
+<p class="sub">One method per operation. Each method is named after what it does, not the HTTP verb. Callers never see headers, status codes, or URL strings.</p>
+
+<div class="lbl">services/user.service.ts</div>
+<div class="cb">
+<span class="kw">import</span> { APIRequestContext } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> { BaseClient } <span class="kw">from</span> <span class="str">'./base.client'</span>;<br>
+<br>
+<span class="kw">export interface</span> <span class="tp">User</span> {<br>
+&nbsp;&nbsp;id: <span class="kw">number</span>; name: <span class="kw">string</span>; email: <span class="kw">string</span>; role: <span class="kw">string</span>;<br>
+}<br>
+<span class="kw">export type</span> <span class="tp">CreateUserDto</span> = Omit&lt;<span class="tp">User</span>, <span class="str">'id'</span>&gt; & { password: <span class="kw">string</span> };<br>
+<span class="kw">export type</span> <span class="tp">UpdateUserDto</span> = Partial&lt;Omit&lt;<span class="tp">User</span>, <span class="str">'id'</span>&gt;&gt;;<br>
+<br>
+<span class="kw">export class</span> <span class="tp">UserService</span> <span class="kw">extends</span> <span class="tp">BaseClient</span> {<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> getAll(): Promise&lt;<span class="tp">User</span>[]&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.get(<span class="str">`${this.baseURL}/users`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">User</span>[]&gt;(res, <span class="str">'GET /users'</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> getById(id: <span class="kw">number</span>): Promise&lt;<span class="tp">User</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.get(<span class="str">`${this.baseURL}/users/${id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">User</span>&gt;(res, <span class="str">`GET /users/${id}`</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> create(data: <span class="tp">CreateUserDto</span>): Promise&lt;<span class="tp">User</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> email = data.email ?? <span class="str">`user-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`</span>;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.post(<span class="str">`${this.baseURL}/users`</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { ...data, email },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">User</span>&gt;(res, <span class="str">'POST /users'</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> update(id: <span class="kw">number</span>, data: <span class="tp">UpdateUserDto</span>): Promise&lt;<span class="tp">User</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.patch(<span class="str">`${this.baseURL}/users/${id}`</span>, { data });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">User</span>&gt;(res, <span class="str">`PATCH /users/${id}`</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> delete(id: <span class="kw">number</span>): Promise&lt;<span class="kw">void</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.delete(<span class="str">`${this.baseURL}/users/${id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// 404 on delete is fine — resource may have been cleaned up already</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (!res.ok() && res.status() !== <span class="nm">404</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await this</span>.assertOk(res, <span class="str">`DELETE /users/${id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Returns the raw response — for testing error cases</span><br>
+&nbsp;&nbsp;<span class="kw">async</span> createRaw(data: Partial&lt;<span class="tp">CreateUserDto</span>&gt;) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.request.post(<span class="str">`${this.baseURL}/users`</span>, { data });<br>
+&nbsp;&nbsp;}<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>The <code>createRaw</code> method exists for negative tests.</strong> When testing that a 422 is returned for a missing field, you need the raw response — not a parsed object. Every service should expose both a typed convenience method (for happy-path tests) and a raw method (for error-case tests) for write operations.</p></div>
+<button class="askbtn" onclick="sendPrompt('What are the best practices for negative API testing in Playwright?')">Negative testing ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>PostService — same pattern, different domain</h3>
+<p class="sub">Services compose naturally — PostService can call UserService internally. Each service owns its own domain completely.</p>
+
+<div class="lbl">services/post.service.ts</div>
+<div class="cb">
+<span class="kw">import</span> { APIRequestContext } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> { BaseClient } <span class="kw">from</span> <span class="str">'./base.client'</span>;<br>
+<br>
+<span class="kw">export interface</span> <span class="tp">Post</span> {<br>
+&nbsp;&nbsp;id: <span class="kw">number</span>; title: <span class="kw">string</span>; body: <span class="kw">string</span>; userId: <span class="kw">number</span>;<br>
+}<br>
+<span class="kw">export type</span> <span class="tp">CreatePostDto</span> = Omit&lt;<span class="tp">Post</span>, <span class="str">'id'</span>&gt;;<br>
+<br>
+<span class="kw">export class</span> <span class="tp">PostService</span> <span class="kw">extends</span> <span class="tp">BaseClient</span> {<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> getAll(filters?: { userId?: <span class="kw">number</span> }): Promise&lt;<span class="tp">Post</span>[]&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.get(<span class="str">`${this.baseURL}/posts`</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;params: filters,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">Post</span>[]&gt;(res, <span class="str">'GET /posts'</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> getById(id: <span class="kw">number</span>): Promise&lt;<span class="tp">Post</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.get(<span class="str">`${this.baseURL}/posts/${id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">Post</span>&gt;(res, <span class="str">`GET /posts/${id}`</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> create(data: <span class="tp">CreatePostDto</span>): Promise&lt;<span class="tp">Post</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.post(<span class="str">`${this.baseURL}/posts`</span>, { data });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">Post</span>&gt;(res, <span class="str">'POST /posts'</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> update(id: <span class="kw">number</span>, data: Partial&lt;<span class="tp">CreatePostDto</span>&gt;): Promise&lt;<span class="tp">Post</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.patch(<span class="str">`${this.baseURL}/posts/${id}`</span>, { data });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.assertAndParse&lt;<span class="tp">Post</span>&gt;(res, <span class="str">`PATCH /posts/${id}`</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> delete(id: <span class="kw">number</span>): Promise&lt;<span class="kw">void</span>&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await this</span>.request.delete(<span class="str">`${this.baseURL}/posts/${id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> (!res.ok() && res.status() !== <span class="nm">404</span>) <span class="kw">await this</span>.assertOk(res, <span class="str">`DELETE /posts/${id}`</span>);<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Domain operation — not just a raw HTTP call</span><br>
+&nbsp;&nbsp;<span class="kw">async</span> getAllByUser(userId: <span class="kw">number</span>): Promise&lt;<span class="tp">Post</span>[]&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.getAll({ userId });<br>
+&nbsp;&nbsp;}<br>
+<br>
+&nbsp;&nbsp;<span class="kw">async</span> createRaw(data: Partial&lt;<span class="tp">CreatePostDto</span>&gt;) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return this</span>.request.post(<span class="str">`${this.baseURL}/posts`</span>, { data });<br>
+&nbsp;&nbsp;}<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p><code>getAllByUser(userId)</code> is an example of a domain operation — it's not just wrapping an HTTP call, it's expressing intent. A test that calls <code>posts.getAllByUser(user.id)</code> is immediately readable. One that calls <code>request.get('/posts', { params: { userId: user.id } })</code> requires the reader to parse URL semantics to understand the same thing.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I chain API requests in Playwright — create a resource then use its ID in subsequent assertions')">Chaining with services ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Fixtures — inject services into tests</h3>
+<p class="sub">Services are instantiated once per test via fixtures. Tests receive typed service objects — they never call <code>new UserService()</code>.</p>
+
+<div class="lbl">fixtures/index.ts</div>
+<div class="cb">
+<span class="kw">import</span> { test <span class="kw">as</span> base, APIRequestContext } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> { UserService } <span class="kw">from</span> <span class="str">'../services/user.service'</span>;<br>
+<span class="kw">import</span> { PostService } <span class="kw">from</span> <span class="str">'../services/post.service'</span>;<br>
+<br>
+<span class="kw">type</span> <span class="tp">ServiceFixtures</span> = {<br>
+&nbsp;&nbsp;users: UserService;<br>
+&nbsp;&nbsp;posts: PostService;<br>
+};<br>
+<br>
+<span class="kw">export const</span> test = base.extend&lt;<span class="tp">ServiceFixtures</span>&gt;({<br>
+<br>
+&nbsp;&nbsp;users: <span class="kw">async</span> ({ request }, use) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> use(<span class="kw">new</span> UserService(request, process.env.BASE_URL!));<br>
+&nbsp;&nbsp;},<br>
+<br>
+&nbsp;&nbsp;posts: <span class="kw">async</span> ({ request }, use) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> use(<span class="kw">new</span> PostService(request, process.env.BASE_URL!));<br>
+&nbsp;&nbsp;},<br>
+<br>
+});<br>
+<br>
+<span class="kw">export</span> { expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p>Services receive the test's <code>request</code> fixture — meaning they automatically use the auth headers and <code>baseURL</code> you configured in <code>playwright.config.ts</code>. No extra auth setup in services themselves. If you need a service with different auth (e.g. admin vs user), create a custom <code>APIRequestContext</code> and pass it instead.</p></div>
+
+<div class="lbl">Optional — pre-created resource fixtures</div>
+<div class="cb">
+<span class="kw">type</span> <span class="tp">ServiceFixtures</span> = {<br>
+&nbsp;&nbsp;users: UserService;<br>
+&nbsp;&nbsp;posts: PostService;<br>
+&nbsp;&nbsp;testUser: <span class="tp">User</span>;&nbsp;&nbsp;<span class="cm">// pre-created, auto-deleted</span><br>
+};<br>
+<br>
+<span class="kw">export const</span> test = base.extend&lt;<span class="tp">ServiceFixtures</span>&gt;({<br>
+&nbsp;&nbsp;users: <span class="kw">async</span> ({ request }, use) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> use(<span class="kw">new</span> UserService(request, process.env.BASE_URL!));<br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;posts: <span class="kw">async</span> ({ request }, use) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> use(<span class="kw">new</span> PostService(request, process.env.BASE_URL!));<br>
+&nbsp;&nbsp;},<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Creates a user before the test, deletes it after</span><br>
+&nbsp;&nbsp;testUser: <span class="kw">async</span> ({ users }, use) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> users.create({ name: <span class="str">'Fixture User'</span>, role: <span class="str">'member'</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> use(user);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// test runs here</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> users.delete(user.id);&nbsp;&nbsp;&nbsp;<span class="cm">// cleanup — 404 handled in service</span><br>
+&nbsp;&nbsp;},<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+<button class="askbtn" onclick="sendPrompt('Show me how to write a Playwright fixture that creates a user via API before each test and deletes them after')">Full fixture guide ↗</button>
+</div>
+
+<div class="pnl" id="p5">
+<h3>Tests — clean, readable, business-focused</h3>
+<p class="sub">This is what the service layer delivers. Every test reads like a specification. No HTTP, no headers, no URL strings.</p>
+
+<div class="cb">
+<span class="cm">// tests/users.spec.ts</span><br>
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'../fixtures'</span>;<br>
+<br>
+test.describe(<span class="str">'User management'</span>, () => {<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'creates a user and fetches them back'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ tag: <span class="str">'@smoke'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> ({ users }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> created = <span class="kw">await</span> users.create({ name: <span class="str">'Alice'</span>, role: <span class="str">'member'</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> fetched = <span class="kw">await</span> users.getById(created.id);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(fetched.name).toBe(<span class="str">'Alice'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(fetched.id).toBe(created.id);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> users.delete(created.id);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'updates only the fields sent'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ tag: <span class="str">'@regression'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> ({ users, testUser }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> updated = <span class="kw">await</span> users.update(testUser.id, { name: <span class="str">'Updated'</span> });<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(updated.name).toBe(<span class="str">'Updated'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(updated.email).toBe(testUser.email);&nbsp;<span class="cm">// untouched</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(updated.role).toBe(testUser.role);&nbsp;&nbsp;&nbsp;<span class="cm">// untouched</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'rejects missing name with 422'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ tag: <span class="str">'@regression'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> ({ users }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Raw method for error case — we need the response object</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> users.createRaw({ role: <span class="str">'member'</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">422</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(<span class="kw">await</span> res.json()).toHaveProperty(<span class="str">'errors'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;);<br>
+<br>
+});<br>
+<br>
+<span class="cm">// tests/posts.spec.ts — services compose naturally</span><br>
+test.describe(<span class="str">'Post management'</span>, () => {<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'user posts are filterable by owner'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ tag: <span class="str">'@regression'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> ({ users, posts }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> users.create({ name: <span class="str">'Bob'</span>, role: <span class="str">'author'</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> post = <span class="kw">await</span> posts.create({ title: <span class="str">'Bob post'</span>, body: <span class="str">'Content'</span>, userId: user.id });<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> userPosts = <span class="kw">await</span> posts.getAllByUser(user.id);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(userPosts.every(p => p.userId === user.id)).toBeTruthy();<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> posts.delete(post.id);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> users.delete(user.id);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;);<br>
+<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p>Compare this to the raw HTTP version in Tab 1. Same logic — completely different readability. A new engineer can read these tests and understand the API contract without knowing anything about HTTP, headers, or Playwright internals. That's the service layer paying off.</p></div>
+<button class="askbtn" onclick="sendPrompt('How does Playwright parallel test execution work for API tests, and what are the common pitfalls?')">Parallel safety ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>

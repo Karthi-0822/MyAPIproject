@@ -1,0 +1,406 @@
+
+<h2 class="sr-only">Allure reporting with Playwright — complete setup guide covering installation, configuration, API request attachments, labels, steps, and CI integration</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.kw{color:var(--color-text-info)}.str{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.tp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.step-row{display:flex;gap:12px;margin:.5rem 0;padding:.75rem 1rem;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);align-items:flex-start;background:var(--color-background-primary)}
+.snum{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;margin-top:1px;background:var(--color-background-info);color:var(--color-text-info)}
+.sbody h4{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.sbody p{font-size:12.5px;color:var(--color-text-secondary);line-height:1.5}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500;font-family:var(--font-sans)}
+.b-info{background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)}
+.b-success{background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)}
+.b-warn{background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning)}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · Install &amp; config</button>
+  <button class="tab" onclick="go(1)">2 · First report</button>
+  <button class="tab" onclick="go(2)">3 · Attach requests</button>
+  <button class="tab" onclick="go(3)">4 · Labels &amp; metadata</button>
+  <button class="tab" onclick="go(4)">5 · Full example</button>
+  <button class="tab" onclick="go(5)">6 · CI workflow</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>Install and configure</h3>
+<p class="sub">Three packages, one config change. Everything else builds on this.</p>
+
+<div class="lbl">Install</div>
+<div class="cb">
+<span class="cm"># The reporter and the decorator library for labels/steps/attachments</span><br>
+npm install -D allure-playwright allure-js-commons<br>
+<br>
+<span class="cm"># Allure CLI — generates the HTML report from raw results</span><br>
+npm install -D allure-commandline<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">playwright.config.ts — add the reporter</div>
+<div class="cb">
+<span class="kw">import</span> { defineConfig } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<br>
+<span class="kw">export default</span> defineConfig({<br>
+&nbsp;&nbsp;reporter: [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Allure writes raw result files here</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;[<span class="str">'allure-playwright'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;detail:        <span class="kw">true</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// include test steps</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outputFolder:  <span class="str">'allure-results'</span>,  <span class="cm">// raw result files land here</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suiteTitle:    <span class="kw">true</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// use describe block as suite name</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;}],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Keep list reporter for local terminal output</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;[<span class="str">'list'</span>],<br>
+&nbsp;&nbsp;],<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Add scripts to package.json</div>
+<div class="cb">
+{<br>
+&nbsp;&nbsp;<span class="str">"scripts"</span>: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"test"</span>:            <span class="str">"playwright test"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"allure:generate"</span>: <span class="str">"allure generate allure-results --clean -o allure-report"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"allure:open"</span>:     <span class="str">"allure open allure-report"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"allure:serve"</span>:    <span class="str">"allure serve allure-results"</span><br>
+&nbsp;&nbsp;}<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>Two-step process.</strong> Running tests writes raw <code>.json</code> files into <code>allure-results/</code>. The <code>allure generate</code> command then converts those into a browsable HTML site in <code>allure-report/</code>. <code>allure serve</code> does both steps at once and opens a local server — good for local debugging.</p></div>
+<button class="askbtn" onclick="sendPrompt('What is the difference between Allure reporting and the built-in Playwright HTML reporter?')">Allure vs Playwright HTML reporter ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Run tests and generate your first report</h3>
+<p class="sub">The exact commands to go from zero to a working Allure report in your browser.</p>
+
+<div class="step-row">
+  <div class="snum">1</div>
+  <div class="sbody"><h4>Run the tests</h4><p>Raw result files are written to <code>allure-results/</code></p></div>
+</div>
+<div class="cb">
+npx playwright test<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="step-row">
+  <div class="snum">2</div>
+  <div class="sbody"><h4>Generate the HTML report</h4><p>Converts raw files into a self-contained HTML site</p></div>
+</div>
+<div class="cb">
+npm run allure:generate<br>
+<span class="cm"># or directly:</span><br>
+npx allure generate allure-results --clean -o allure-report<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="step-row">
+  <div class="snum">3</div>
+  <div class="sbody"><h4>Open the report</h4><p>Starts a local server and opens in your browser</p></div>
+</div>
+<div class="cb">
+npm run allure:open<br>
+<span class="cm"># or one command for both generate + open:</span><br>
+npm run allure:serve<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Add allure-results to .gitignore</div>
+<div class="cb">
+<span class="cm"># .gitignore</span><br>
+allure-results/<br>
+allure-report/<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="warn"><p><strong>Always use <code>--clean</code> when generating.</strong> Without it, Allure merges new results with old ones — a test that previously failed shows as flaky even if it now always passes. <code>--clean</code> wipes the output folder before generating so you always see only the latest run.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I set up a GitHub Actions workflow for running Playwright API tests with secrets and HTML report upload?')">CI workflow ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>Attach API request and response details</h3>
+<p class="sub">The most valuable Allure feature for API testing — attach the full request and response to every test so you can debug failures without re-running.</p>
+
+<div class="lbl">tests/helpers/allure-request.ts — reusable attachment helper</div>
+<div class="cb">
+<span class="kw">import</span> { APIResponse } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> * <span class="kw">as</span> allure <span class="kw">from</span> <span class="str">'allure-js-commons'</span>;<br>
+<br>
+<span class="kw">interface</span> <span class="tp">RequestLog</span> {<br>
+&nbsp;&nbsp;method:  <span class="kw">string</span>;<br>
+&nbsp;&nbsp;url:     <span class="kw">string</span>;<br>
+&nbsp;&nbsp;payload?: <span class="kw">unknown</span>;<br>
+}<br>
+<br>
+<span class="kw">export async function</span> attachRequest(<br>
+&nbsp;&nbsp;response: APIResponse,<br>
+&nbsp;&nbsp;req: <span class="tp">RequestLog</span><br>
+): Promise&lt;<span class="kw">void</span>&gt; {<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Attach request details</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> requestData = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;method:  req.method,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;url:     req.url,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;payload: req.payload ?? <span class="kw">null</span>,<br>
+&nbsp;&nbsp;};<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.attachment(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">'Request'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;JSON.stringify(requestData, <span class="kw">null</span>, <span class="nm">2</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ contentType: <span class="str">'application/json'</span> }<br>
+&nbsp;&nbsp;);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Attach response status + headers + body</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> responseData = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;status:  response.status(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;headers: response.headers(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body:    <span class="kw">await</span> safeJson(response),<br>
+&nbsp;&nbsp;};<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.attachment(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">'Response'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;JSON.stringify(responseData, <span class="kw">null</span>, <span class="nm">2</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ contentType: <span class="str">'application/json'</span> }<br>
+&nbsp;&nbsp;);<br>
+}<br>
+<br>
+<span class="kw">async function</span> safeJson(r: APIResponse): Promise&lt;<span class="kw">unknown</span>&gt; {<br>
+&nbsp;&nbsp;<span class="kw">try</span> { <span class="kw">return await</span> r.json(); }<br>
+&nbsp;&nbsp;<span class="kw">catch</span> { <span class="kw">return await</span> r.text(); }<br>
+}<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Using the helper in a test</div>
+<div class="cb">
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> { attachRequest } <span class="kw">from</span> <span class="str">'./helpers/allure-request'</span>;<br>
+<br>
+test(<span class="str">'POST /users creates a user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> payload = { name: <span class="str">'Alice'</span>, email: <span class="str">`a-${Date.now()}@test.com`</span> };<br>
+<br>
+&nbsp;&nbsp;<span class="kw">const</span> response = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, { data: payload });<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Attach full request + response to the Allure report</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> attachRequest(response, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;method:  <span class="str">'POST'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;url:     <span class="str">'/users'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;payload,<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;expect(response.status()).toBe(<span class="nm">201</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p><strong>Always attach before asserting.</strong> If you attach after the assertion and the assertion throws, the attachment never runs — you lose the response body right when you need it most. Attach immediately after the request returns, then assert.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I chain API requests in Playwright — create a resource then use its ID in subsequent assertions')">Chaining requests ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>Labels, severity, and metadata</h3>
+<p class="sub">Allure metadata makes reports filterable and readable for non-engineers. Add these to every test.</p>
+
+<div class="lbl">All available decorators</div>
+<div class="cb">
+<span class="kw">import</span> * <span class="kw">as</span> allure <span class="kw">from</span> <span class="str">'allure-js-commons'</span>;<br>
+<br>
+test(<span class="str">'GET /users returns user list'</span>, <span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Suite hierarchy — appears in Allure's tree navigation</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.epic(<span class="str">'User management'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.feature(<span class="str">'User listing'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.story(<span class="str">'Admin can view all users'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Severity — critical, normal, minor, trivial, blocker</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.severity(<span class="str">'critical'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Tags — same as Playwright @tags, visible in report</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.tag(<span class="str">'smoke'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.tag(<span class="str">'users'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Link to ticket / docs</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.issue(<span class="str">'https://jira.yourco.com/browse/API-42'</span>);<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.tms(<span class="str">'https://testrail.yourco.com/C123'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Owner — visible in Allure dashboard</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.owner(<span class="str">'alice@yourco.com'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Description — rendered as markdown in report</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.description(<span class="str">`<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Verifies GET /users returns a non-empty array.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Each item must have id, name, and email.<br>
+&nbsp;&nbsp;`</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="kw">const</span> response = <span class="kw">await</span> request.get(<span class="str">'/users'</span>);<br>
+&nbsp;&nbsp;expect(response).toBeOK();<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Named steps — visible in the report timeline</div>
+<div class="cb">
+test(<span class="str">'full user flow with named steps'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.severity(<span class="str">'critical'</span>);<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// allure.step() wraps a block — shows in the report timeline</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> allure.step(<span class="str">'Create test user'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Alice'</span>, email: <span class="str">`a-${Date.now()}@t.com`</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> attachRequest(res, { method: <span class="str">'POST'</span>, url: <span class="str">'/users'</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> res.json();<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.step(<span class="str">'Verify user is fetchable'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">`/users/${user.id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> attachRequest(res, { method: <span class="str">'GET'</span>, url: <span class="str">`/users/${user.id}`</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;<span class="kw">await</span> allure.step(<span class="str">'Clean up — delete user'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> request.delete(<span class="str">`/users/${user.id}`</span>);<br>
+&nbsp;&nbsp;});<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+<button class="askbtn" onclick="sendPrompt('How do I organise Playwright API tests with describe blocks, tags, and multiple environments?')">Organising tests ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Complete real-world test file</h3>
+<p class="sub">All patterns together — metadata, steps, request attachments, and assertions in one production-ready spec.</p>
+
+<div class="cb">
+<span class="cm">// tests/users.spec.ts</span><br>
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'@playwright/test'</span>;<br>
+<span class="kw">import</span> * <span class="kw">as</span> allure <span class="kw">from</span> <span class="str">'allure-js-commons'</span>;<br>
+<span class="kw">import</span> { attachRequest } <span class="kw">from</span> <span class="str">'./helpers/allure-request'</span>;<br>
+<br>
+test.describe(<span class="str">'Users API'</span>, () => {<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'POST /users — creates and persists a user'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ tag: [<span class="str">'@smoke'</span>, <span class="str">'@regression'</span>] },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">async</span> ({ request }) => {<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Metadata</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.epic(<span class="str">'User management'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.feature(<span class="str">'Create user'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.severity(<span class="str">'critical'</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.owner(<span class="str">'backend-team'</span>);<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> payload = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:  <span class="str">'Alice'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;email: <span class="str">`alice-${Date.now()}@test.com`</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 1 — create</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> created = <span class="kw">await</span> allure.step(<span class="str">'POST /users'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, { data: payload });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> attachRequest(res, { method: <span class="str">'POST'</span>, url: <span class="str">'/users'</span>, payload });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">201</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="kw">await</span> res.json();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 2 — verify persistence</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.step(<span class="str">'GET /users/:id — verify persisted'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">`/users/${created.id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> attachRequest(res, { method: <span class="str">'GET'</span>, url: <span class="str">`/users/${created.id}`</span> });<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> fetched = <span class="kw">await</span> res.json();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(fetched.email).toBe(payload.email);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Step 3 — clean up</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> allure.step(<span class="str">'DELETE /users/:id'</span>, <span class="kw">async</span> () => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.delete(<span class="str">`/users/${created.id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">204</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;);<br>
+<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+<button class="askbtn" onclick="sendPrompt('Show me how to chain API requests in Playwright — create a resource then use its ID in subsequent assertions')">Chaining requests ↗</button>
+</div>
+
+<div class="pnl" id="p5">
+<h3>CI workflow — generate and publish the report</h3>
+<p class="sub">Run tests, generate the report, and upload it as an artifact — all in one GitHub Actions workflow.</p>
+
+<div class="cb">
+<span class="kw">name</span>: <span class="str">API tests with Allure</span><br>
+<br>
+<span class="kw">on</span>:<br>
+&nbsp;&nbsp;<span class="kw">pull_request</span>:<br>
+&nbsp;&nbsp;<span class="kw">push</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">branches</span>: [<span class="str">main</span>]<br>
+<br>
+<span class="kw">jobs</span>:<br>
+&nbsp;&nbsp;<span class="kw">test</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">runs-on</span>: <span class="str">ubuntu-latest</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">steps</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">uses</span>: <span class="str">actions/checkout@v4</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">uses</span>: <span class="str">actions/setup-node@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">node-version</span>: <span class="str">'20'</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">cache</span>: <span class="str">'npm'</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">run</span>: <span class="str">npm ci</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">name</span>: <span class="str">Run Playwright tests</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">run</span>: <span class="str">npx playwright test</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">env</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">CI</span>: <span class="str">true</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">BASE_URL</span>: <span class="str">${{ secrets.STAGING_BASE_URL }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">API_TOKEN</span>: <span class="str">${{ secrets.STAGING_API_TOKEN }}</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">name</span>: <span class="str">Generate Allure report</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span>: <span class="str">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">run</span>: <span class="str">npx allure generate allure-results --clean -o allure-report</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">name</span>: <span class="str">Upload Allure report</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">uses</span>: <span class="str">actions/upload-artifact@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span>: <span class="str">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">name</span>: <span class="str">allure-report-${{ github.run_id }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">path</span>: <span class="str">allure-report/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">retention-days</span>: <span class="nm">30</span><br>
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">  # Optional: also upload raw results for history tracking</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="kw">name</span>: <span class="str">Upload raw results</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">uses</span>: <span class="str">actions/upload-artifact@v4</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span>: <span class="str">always()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">with</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">name</span>: <span class="str">allure-results-${{ github.run_id }}</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">path</span>: <span class="str">allure-results/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">retention-days</span>: <span class="nm">7</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="ok"><p>Upload both <code>allure-report/</code> and <code>allure-results/</code>. The generated report is what you download and open in a browser right now. The raw results are what Allure uses to build trend charts across runs — if you connect Allure to GitHub Pages or Allure TestOps, it reads the raw results history to show pass-rate trends over time.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I build a Page Object Model service layer for Playwright API tests?')">API service layer ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>

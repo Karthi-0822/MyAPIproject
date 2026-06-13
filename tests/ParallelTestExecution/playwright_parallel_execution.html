@@ -1,0 +1,364 @@
+
+<h2 class="sr-only">Playwright parallel test execution for API tests — how workers work, common pitfalls, and solutions with complete code examples</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0 2rem;font-family:var(--font-sans)}
+.tabs{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:5px 15px;border-radius:99px;font-size:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);background:transparent;font-family:var(--font-sans);transition:all .15s}
+.tab.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.tab:hover:not(.on){background:var(--color-background-secondary)}
+.pnl{display:none}.pnl.on{display:block}
+h3{font-size:15px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.75rem}
+.cb{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem 1.25rem;margin:.75rem 0;font-family:var(--font-mono);font-size:12.5px;line-height:1.9;color:var(--color-text-primary);position:relative;overflow-x:auto}
+.kw{color:var(--color-text-info)}.str{color:var(--color-text-success)}.cm{color:var(--color-text-tertiary);font-style:italic}.nm{color:var(--color-text-warning)}.tp{color:#a855f7}
+.cpb{position:absolute;top:10px;right:10px;padding:3px 9px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.cpb:hover{background:var(--color-background-secondary)}
+.info{border-left:2px solid var(--color-border-info);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-info);border-radius:0}
+.info p{font-size:13px;color:var(--color-text-info);line-height:1.6}
+.warn{border-left:2px solid var(--color-border-warning);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-warning);border-radius:0}
+.warn p{font-size:13px;color:var(--color-text-warning);line-height:1.6}
+.ok{border-left:2px solid var(--color-border-success);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-success);border-radius:0}
+.ok p{font-size:13px;color:var(--color-text-success);line-height:1.6}
+.err{border-left:2px solid var(--color-border-danger);padding:.7rem 1rem;margin:.75rem 0;background:var(--color-background-danger);border-radius:0}
+.err p{font-size:13px;color:var(--color-text-danger);line-height:1.6}
+.lbl{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .35rem}
+.askbtn{padding:6px 13px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);margin-top:.75rem}
+.askbtn:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:.75rem 0}
+th{text-align:left;padding:7px 10px;font-weight:500;font-size:12px;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)}
+td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:top;line-height:1.5}
+td code{font-family:var(--font-mono);font-size:11.5px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem}
+.card h4{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px}
+.card p{font-size:12.5px;color:var(--color-text-secondary);line-height:1.6}
+.badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px;font-weight:500;font-family:var(--font-sans);margin-bottom:8px}
+.b-info{background:var(--color-background-info);color:var(--color-text-info);border:0.5px solid var(--color-border-info)}
+.b-warn{background:var(--color-background-warning);color:var(--color-text-warning);border:0.5px solid var(--color-border-warning)}
+.b-danger{background:var(--color-background-danger);color:var(--color-text-danger);border:0.5px solid var(--color-border-danger)}
+.b-success{background:var(--color-background-success);color:var(--color-text-success);border:0.5px solid var(--color-border-success)}
+.pitfall{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;margin:.75rem 0}
+.pitfall-head{padding:.75rem 1rem;display:flex;align-items:center;gap:10px;background:var(--color-background-secondary)}
+.pitfall-head h4{font-size:13px;font-weight:500;color:var(--color-text-primary);margin:0}
+.pitfall-body{padding:.75rem 1rem}
+</style>
+
+<div class="w">
+<div class="tabs" role="tablist">
+  <button class="tab on" onclick="go(0)">1 · How workers work</button>
+  <button class="tab" onclick="go(1)">2 · Config options</button>
+  <button class="tab" onclick="go(2)">3 · Pitfall: shared state</button>
+  <button class="tab" onclick="go(3)">4 · Pitfall: data collision</button>
+  <button class="tab" onclick="go(4)">5 · Pitfall: ordering</button>
+  <button class="tab" onclick="go(5)">6 · Safe patterns</button>
+</div>
+
+<div class="pnl on" id="p0">
+<h3>How Playwright workers run your tests</h3>
+<p class="sub">Playwright distributes tests across worker processes. Each worker is an independent Node.js process — they share nothing by default.</p>
+
+<div class="lbl">What each worker owns exclusively</div>
+<div class="grid2">
+  <div class="card">
+    <span class="badge b-info">Isolated per worker</span>
+    <p style="font-size:12.5px;color:var(--color-text-secondary);line-height:1.7">
+      ✓ Its own Node.js process<br>
+      ✓ Its own memory space<br>
+      ✓ Its own fixture instances<br>
+      ✓ Its own <code>request</code> context<br>
+      ✓ Its own env variables (read-only)
+    </p>
+  </div>
+  <div class="card">
+    <span class="badge b-danger">Shared across all workers</span>
+    <p style="font-size:12.5px;color:var(--color-text-secondary);line-height:1.7">
+      ✗ The database / API server<br>
+      ✗ Any global test data by name/email<br>
+      ✗ Rate limit counters<br>
+      ✗ External service quotas<br>
+      ✗ File system (if writing files)
+    </p>
+  </div>
+</div>
+
+<div class="lbl">Test distribution — how tests get assigned to workers</div>
+<div class="cb">
+<span class="cm">// With 4 workers and 12 tests, Playwright distributes like this:</span><br>
+<span class="cm">// Worker 1: tests 1, 5, 9</span><br>
+<span class="cm">// Worker 2: tests 2, 6, 10</span><br>
+<span class="cm">// Worker 3: tests 3, 7, 11</span><br>
+<span class="cm">// Worker 4: tests 4, 8, 12</span><br>
+<br>
+<span class="cm">// The order is not guaranteed — worker 3 might finish test 7</span><br>
+<span class="cm">// before worker 1 finishes test 1. Never assume order.</span><button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="info"><p><strong>Workers are processes, not threads.</strong> They truly share nothing in memory. A variable set in Worker 1 is completely invisible to Worker 2. This is good for isolation — but it means any state that does need sharing (like a cached auth token) must go through the API itself or a worker-scoped fixture.</p></div>
+<button class="askbtn" onclick="sendPrompt('How do I handle Bearer token auth in Playwright API tests across multiple test files using fixtures?')">Worker-scoped auth fixtures ↗</button>
+</div>
+
+<div class="pnl" id="p1">
+<h3>Parallel execution config</h3>
+<p class="sub">Three settings control how parallel execution behaves. Know all three.</p>
+
+<div class="lbl">playwright.config.ts — parallel settings</div>
+<div class="cb">
+<span class="kw">export default</span> defineConfig({<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Run every test in its own worker — maximum parallelism</span><br>
+&nbsp;&nbsp;<span class="cm">// Default: false (tests in same file run sequentially)</span><br>
+&nbsp;&nbsp;fullyParallel: <span class="kw">true</span>,<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Number of parallel worker processes</span><br>
+&nbsp;&nbsp;<span class="cm">// Default: half the CPU count on your machine</span><br>
+&nbsp;&nbsp;workers: <span class="nm">4</span>,<br>
+<br>
+&nbsp;&nbsp;<span class="cm">// Or as a percentage of CPU cores</span><br>
+&nbsp;&nbsp;workers: <span class="str">'75%'</span>,<br>
+<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Parallelism levels — what each setting controls</div>
+<table>
+<tr><th>Setting</th><th>What runs in parallel</th><th>When to use</th></tr>
+<tr><td><code>fullyParallel: false</code> (default)</td><td>Files run in parallel — tests within a file run in order</td><td>Tests in a file share state or must run in sequence</td></tr>
+<tr><td><code>fullyParallel: true</code></td><td>Every individual test runs in parallel, across all files</td><td>Pure API tests with no shared state — the fastest option</td></tr>
+<tr><td><code>test.describe.serial()</code></td><td>That group runs sequentially regardless of other settings</td><td>Stateful flows where test order matters</td></tr>
+</table>
+
+<div class="lbl">Override parallelism for one file</div>
+<div class="cb">
+<span class="cm">// Force this entire file to run sequentially</span><br>
+<span class="cm">// even when fullyParallel: true is set globally</span><br>
+test.describe.configure({ mode: <span class="str">'serial'</span> });<br>
+<br>
+<span class="cm">// Or use the annotation at the file level</span><br>
+test.describe(<span class="str">'stateful admin setup'</span>, () => {<br>
+&nbsp;&nbsp;test.describe.configure({ mode: <span class="str">'serial'</span> });<br>
+&nbsp;&nbsp;<span class="cm">// These run in order: 1, 2, 3</span><br>
+&nbsp;&nbsp;test(<span class="str">'1. create admin user'</span>, <span class="kw">async</span> ({ request }) => { <span class="cm">/* ... */</span> });<br>
+&nbsp;&nbsp;test(<span class="str">'2. assign permissions'</span>, <span class="kw">async</span> ({ request }) => { <span class="cm">/* ... */</span> });<br>
+&nbsp;&nbsp;test(<span class="str">'3. verify access'</span>, <span class="kw">async</span> ({ request }) => { <span class="cm">/* ... */</span> });<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+<button class="askbtn" onclick="sendPrompt('How do I organise Playwright API tests with describe blocks, tags, and multiple environments?')">Organising test suites ↗</button>
+</div>
+
+<div class="pnl" id="p2">
+<h3>Pitfall 1 — shared mutable state</h3>
+<p class="sub">The most common parallel bug: two tests read, modify, or delete the same record at the same time.</p>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-danger" style="margin:0">broken</span><h4 style="margin-left:8px">Two tests modify the same user</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// Test A (Worker 1)</span><br>
+test(<span class="str">'update user email'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> request.patch(<span class="str">'/users/1'</span>, { data: { email: <span class="str">'a@test.com'</span> } });<br>
+&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> (await request.get(<span class="str">'/users/1'</span>)).json();<br>
+&nbsp;&nbsp;expect(user.email).toBe(<span class="str">'a@test.com'</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ❌ Worker 2 might have changed it to 'b@test.com' between patch and get</span><br>
+});<br>
+<br>
+<span class="cm">// Test B (Worker 2) — running at the same time</span><br>
+test(<span class="str">'update user name'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">await</span> request.patch(<span class="str">'/users/1'</span>, { data: { email: <span class="str">'b@test.com'</span> } });<br>
+&nbsp;&nbsp;<span class="cm">// ❌ Both tests race on user id 1 — results are non-deterministic</span><br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-success" style="margin:0">fixed</span><h4 style="margin-left:8px">Each test creates and owns its own user</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// Both tests create their OWN user via fixture — no sharing</span><br>
+test(<span class="str">'update user email'</span>, <span class="kw">async</span> ({ request, testUser }) => {<br>
+&nbsp;&nbsp;<span class="cm">// testUser is unique to this test — Worker 2 has its own testUser</span><br>
+&nbsp;&nbsp;<span class="kw">await</span> request.patch(<span class="str">`/users/${testUser.id}`</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { email: <span class="str">'updated@test.com'</span> },<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;<span class="kw">const</span> user = <span class="kw">await</span> (await request.get(<span class="str">`/users/${testUser.id}`</span>)).json();<br>
+&nbsp;&nbsp;expect(user.email).toBe(<span class="str">'updated@test.com'</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ✅ No other worker touches this user's id</span><br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+<button class="askbtn" onclick="sendPrompt('Show me how to write a Playwright fixture that creates a user via API before each test and deletes them after')">Fixture pattern ↗</button>
+</div>
+
+<div class="pnl" id="p3">
+<h3>Pitfall 2 — data collision on unique constraints</h3>
+<p class="sub">Two workers creating records with the same hardcoded name or email will collide on unique constraints. This is the most common flakiness cause in parallel API suites.</p>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-danger" style="margin:0">broken</span><h4 style="margin-left:8px">Hardcoded email collides under parallel workers</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// Both workers try to create this exact user simultaneously</span><br>
+test(<span class="str">'create user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Test User'</span>, email: <span class="str">'test@example.com'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// ❌ Worker 1 and Worker 2 both POST this — one gets 409 Conflict</span><br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">201</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-success" style="margin:0">fixed</span><h4 style="margin-left:8px">Unique identifier per test run</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// Generate a unique email for every test invocation</span><br>
+<span class="kw">const</span> uid = () => <span class="str">`${Date.now()}-${Math.random().toString(36).slice(2)}`</span>;<br>
+<br>
+test(<span class="str">'create user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:  <span class="str">'Test User'</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;email: <span class="str">`user-${uid()}@test.com`</span>, <span class="cm">// unique every time</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">201</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ✅ Worker 1 and Worker 2 create different emails — no collision</span><br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+
+<div class="info"><p><strong>Why both <code>Date.now()</code> and <code>Math.random()</code>?</strong> <code>Date.now()</code> alone can collide when two workers generate the email within the same millisecond on a fast machine. Adding the random suffix makes collision probability negligible. Use the same pattern for usernames, slugs, and any other unique-constrained field.</p></div>
+<button class="askbtn" onclick="sendPrompt('What are best practices for negative API testing in Playwright?')">Negative tests ↗</button>
+</div>
+
+<div class="pnl" id="p4">
+<h3>Pitfall 3 — assuming test execution order</h3>
+<p class="sub">Parallel tests run in an unpredictable order. Tests that depend on each other's side effects break silently.</p>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-danger" style="margin:0">broken</span><h4 style="margin-left:8px">Test 2 assumes Test 1 already ran</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// tests/users.spec.ts</span><br>
+<span class="kw">let</span> createdUserId: <span class="kw">number</span>;<br>
+<br>
+test(<span class="str">'1. create user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, { data: { name: <span class="str">'Alice'</span> } });<br>
+&nbsp;&nbsp;createdUserId = (<span class="kw">await</span> res.json()).id;<br>
+&nbsp;&nbsp;<span class="cm">// ❌ With fullyParallel: true, test 2 may run before this</span><br>
+});<br>
+<br>
+test(<span class="str">'2. fetch that user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="cm">// ❌ createdUserId may still be undefined</span><br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">`/users/${createdUserId}`</span>);<br>
+&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+
+<div class="pitfall">
+  <div class="pitfall-head"><span class="badge b-success" style="margin:0">fixed</span><h4 style="margin-left:8px">Each test is fully self-contained</h4></div>
+  <div class="pitfall-body">
+<div class="cb" style="margin:0">
+<span class="cm">// Option A — chain within a single test</span><br>
+test(<span class="str">'create then fetch user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> created = <span class="kw">await</span> (await request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Alice'</span>, email: <span class="str">`a-${Date.now()}@t.com`</span> },<br>
+&nbsp;&nbsp;})).json();<br>
+<br>
+&nbsp;&nbsp;<span class="kw">const</span> fetched = <span class="kw">await</span> (await request.get(<span class="str">`/users/${created.id}`</span>)).json();<br>
+&nbsp;&nbsp;expect(fetched.name).toBe(<span class="str">'Alice'</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ✅ All steps are in one test — order is guaranteed</span><br>
+});<br>
+<br>
+<span class="cm">// Option B — use a fixture to provide pre-created data</span><br>
+test(<span class="str">'fetch user'</span>, <span class="kw">async</span> ({ request, testUser }) => {<br>
+&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">`/users/${testUser.id}`</span>);<br>
+&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ✅ testUser created by fixture before this test ran</span><br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+  </div>
+</div>
+<button class="askbtn" onclick="sendPrompt('Show me how to chain API requests in Playwright — create a resource then use its ID in subsequent assertions')">Chaining within a test ↗</button>
+</div>
+
+<div class="pnl" id="p5">
+<h3>Safe patterns for parallel API tests</h3>
+<p class="sub">These patterns make tests parallel-safe by design — not by luck.</p>
+
+<div class="lbl">The complete safe parallel test file</div>
+<div class="cb">
+<span class="cm">// tests/users.spec.ts — safe for fullyParallel: true</span><br>
+<span class="kw">import</span> { test, expect } <span class="kw">from</span> <span class="str">'../fixtures'</span>;<br>
+<br>
+<span class="cm">// ── Rule 1: No shared mutable variables between tests ─────</span><br>
+<span class="cm">// ── Rule 2: Every test owns its data via fixtures or uid() ─</span><br>
+<span class="cm">// ── Rule 3: No test assumes another test ran first ─────────</span><br>
+<br>
+<span class="kw">const</span> uid = () => <span class="str">`${Date.now()}-${Math.random().toString(36).slice(2)}`</span>;<br>
+<br>
+test.describe(<span class="str">'Users API'</span>, () => {<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'POST — creates unique user'</span>, <span class="kw">async</span> ({ request }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.post(<span class="str">'/users'</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Alice'</span>, email: <span class="str">`alice-${uid()}@test.com`</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">201</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Cleanup — this test created it, this test deletes it</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> { id } = <span class="kw">await</span> res.json();<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">await</span> request.delete(<span class="str">`/users/${id}`</span>);<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'GET — reads own user'</span>, <span class="kw">async</span> ({ request, testUser }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// testUser fixture creates + deletes — safe across workers</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.get(<span class="str">`/users/${testUser.id}`</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;});<br>
+<br>
+&nbsp;&nbsp;test(<span class="str">'PATCH — updates own user only'</span>, <span class="kw">async</span> ({ request, testUser }) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> res = <span class="kw">await</span> request.patch(<span class="str">`/users/${testUser.id}`</span>, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: { name: <span class="str">'Updated'</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expect(res.status()).toBe(<span class="nm">200</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm">// Only touches testUser.id — invisible to other workers</span><br>
+&nbsp;&nbsp;});<br>
+<br>
+});<button class="cpb" onclick="cp(this)">copy</button>
+</div>
+
+<div class="lbl">Parallel safety checklist</div>
+<table>
+<tr><th>Check</th><th>Safe?</th><th>Fix if not</th></tr>
+<tr><td>Using hardcoded IDs like <code>/users/1</code></td><td><span style="color:var(--color-text-danger)">✗ Unsafe</span></td><td>Create resources in fixtures, use dynamic IDs</td></tr>
+<tr><td>Sharing a <code>let</code> variable between tests</td><td><span style="color:var(--color-text-danger)">✗ Unsafe</span></td><td>Move state inside the test or into a fixture</td></tr>
+<tr><td>Hardcoded unique email <code>test@test.com</code></td><td><span style="color:var(--color-text-danger)">✗ Unsafe</span></td><td>Use <code>user-${uid()}@test.com</code></td></tr>
+<tr><td>Test B reads data created by Test A</td><td><span style="color:var(--color-text-danger)">✗ Unsafe</span></td><td>Chain inside one test or use a fixture</td></tr>
+<tr><td>Each test creates + cleans up its own data</td><td><span style="color:var(--color-text-success)">✓ Safe</span></td><td>—</td></tr>
+<tr><td>Using <code>testUser.id</code> from a fixture</td><td><span style="color:var(--color-text-success)">✓ Safe</span></td><td>—</td></tr>
+<tr><td>Read-only GET tests with no mutations</td><td><span style="color:var(--color-text-success)">✓ Safe</span></td><td>—</td></tr>
+</table>
+
+<div class="ok"><p>The single rule that makes a test parallel-safe: <strong>it must not depend on data it did not create, and must clean up everything it did create.</strong> A test that creates its own unique user, uses only that user's ID throughout, and deletes it in teardown will never conflict with any other test — regardless of how many workers are running.</p></div>
+<button class="askbtn" onclick="sendPrompt('Show me a complete GitHub Actions workflow for running Playwright API tests with secrets and HTML report upload')">CI/CD setup ↗</button>
+</div>
+
+</div>
+<script>
+function go(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',i===j));
+  document.querySelectorAll('.pnl').forEach((p,j)=>p.classList.toggle('on',i===j));
+}
+function cp(btn){
+  const b=btn.parentElement;
+  const t=Array.from(b.childNodes).filter(n=>n.tagName!=='BUTTON').map(n=>n.textContent).join('').trim();
+  navigator.clipboard.writeText(t).then(()=>{btn.textContent='copied!';setTimeout(()=>btn.textContent='copy',1500)});
+}
+</script>
