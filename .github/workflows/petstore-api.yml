@@ -34,6 +34,9 @@ jobs:
     env:
       BASE_URL: ${{ secrets.BaseURL }}
     run: npx playwright test tests/Practice/PetStore.test.ts
+  - name: Generate Allure Report
+    if: always()
+    run: npx allure generate allure-results --clean -o allure-report
 
   - name: Upload Playwright Report
     if: always()
@@ -41,4 +44,12 @@ jobs:
     with:
       name: playwright-report
       path: playwright-report
+  - name: Upload Allure Report
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: allure-report
+      path: allure-report
+
+  
 
