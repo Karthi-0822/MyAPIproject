@@ -7,6 +7,7 @@ type MyFixtures = {
 
 export const test = base.extend<MyFixtures>({
   petStore: async ({ request, baseURL }, use) => {
+    console.log('baseURL:', baseURL);
     await use(new PetStoreService(request, baseURL!));
   }
 })
