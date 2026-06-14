@@ -37,7 +37,7 @@ for (const userData of users) {
     // ===== Step 1 =====
     const createResponse = await allure.step('Create User', async () => {
       const response = await petStore.create(requestBody);
-      expect(response.code).toBe(200);
+      expect(response.code).toBe(201);
       expect(response.message).toBeTruthy();
       return response;
     });
