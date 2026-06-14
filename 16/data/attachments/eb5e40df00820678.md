@@ -1,0 +1,92 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: Practice/PetStore.test.ts >> Create User - Alice
+- Location: tests/Practice/PetStore.test.ts:7:7
+
+# Error details
+
+```
+Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: 201
+Received: 200
+```
+
+# Test source
+
+```ts
+  1  | import { test, expect } from '../../Fixture/BasePageFixture';
+  2  | import users from '../../testData/petStoreData.json';
+  3  | import * as allure from 'allure-js-commons';
+  4  | 
+  5  | for (const userData of users) {
+  6  | 
+  7  |   test(`Create User - ${userData.firstName}`, async ({ petStore }) => {
+  8  | 
+  9  |     // ===== Allure Metadata =====
+  10 |     await allure.epic('PetStore');
+  11 |     await allure.feature('User Management');
+  12 |     await allure.story('Create, Fetch and Delete User');
+  13 |     await allure.severity('critical');
+  14 |     await allure.owner('Siva');
+  15 |     await allure.tag('smoke');
+  16 |     await allure.tag('api');
+  17 |     await allure.description(`
+  18 |         Verify user can be:
+  19 |         1. Created
+  20 |         2. Retrieved
+  21 |         3. Deleted
+  22 | 
+  23 |         User Data:${userData.firstName}`);
+  24 | 
+  25 |     const timestamp = Date.now();
+  26 | 
+  27 |     const requestBody = {
+  28 |       username: `${userData.firstName}-${timestamp}`,
+  29 |       firstName: userData.firstName,
+  30 |       lastName: userData.lastName,
+  31 |       email: `${userData.firstName}-${timestamp}@test.com`,
+  32 |       password: 'Password123',
+  33 |       phone: '9999999999',
+  34 |       userStatus: userData.userStatus
+  35 |     };
+  36 | 
+  37 |     // ===== Step 1 =====
+  38 |     const createResponse = await allure.step('Create User', async () => {
+  39 |       const response = await petStore.create(requestBody);
+> 40 |       expect(response.code).toBe(201);
+     |                             ^ Error: expect(received).toBe(expected) // Object.is equality
+  41 |       expect(response.message).toBeTruthy();
+  42 |       return response;
+  43 |     });
+  44 | 
+  45 |     await new Promise(r => setTimeout(r, 1000)); // Adding a small delay to ensure data consistency before fetching
+  46 |     // ===== Step 2 =====
+  47 |     const user =
+  48 |       await allure.step('Fetch Created User', async () => {
+  49 |         const response = await petStore.getByUsername(requestBody.username);
+  50 |         expect(response.username).toBe(requestBody.username);
+  51 |         expect(response.firstName).toBe(requestBody.firstName);
+  52 |         expect(response.lastName).toBe(requestBody.lastName);
+  53 |         expect(response.email).toBe(requestBody.email);
+  54 |         expect(response.phone).toBe(requestBody.phone);
+  55 |         expect(response.userStatus).toBe(requestBody.userStatus);
+  56 |         return response;
+  57 |       });
+  58 |     // ===== Step 3 =====
+  59 | 
+  60 |     await allure.step('Delete User', async () => {
+  61 |       await petStore.delete(requestBody.username);
+  62 |     });
+  63 | 
+  64 |   }
+  65 |   );
+  66 | 
+  67 | }
+```
